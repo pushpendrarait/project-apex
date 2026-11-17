@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Project Apex | Unified Sports Facility Booking Platform</title>
-  <meta name="description" content="Instant multi-tenant sports turf, court and pitch booking platform for Thane, Mumbai, and Navi Mumbai. Dynamic odd-hour discounts and zero double booking.">
+  <meta name="description" content="Instant multi-tenant sports turf, court and pitch booking platform for Thane, Mumbai, and Navi Mumbai. BookMyShow & Snabbit inspired sports booking experience with dynamic odd-hour discounts.">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#10b981">
 
@@ -20,6 +20,23 @@
               DEFAULT: '#10b981',
               dark: '#059669',
               light: '#34d399'
+            },
+            bms: {
+              DEFAULT: '#F84464',
+              hover: '#E03050',
+              dark: '#C42040'
+            },
+            turf: {
+              DEFAULT: '#00D26A',
+              light: '#10B981',
+              dark: '#059669'
+            },
+            midnight: {
+              950: '#090D16',
+              900: '#0F172A',
+              850: '#131B2E',
+              800: '#1E293B',
+              700: '#334155'
             }
           }
         }
@@ -27,7 +44,7 @@
     }
   </script>
 
-  <!-- Google Inter Font -->
+  <!-- Google Plus Jakarta Sans Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -36,13 +53,19 @@
     body {
       font-family: 'Plus Jakarta Sans', sans-serif;
       -webkit-tap-highlight-color: transparent;
+      background-color: #090D16;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.07) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(248, 68, 100, 0.05) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(168, 85, 247, 0.05) 0px, transparent 50%);
+      background-attachment: fixed;
     }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
     }
     .animate-fade-in {
-      animation: fadeIn 0.25s ease-out forwards;
+      animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
     /* Hide scrollbars for slick mobile strips */
     .scrollbar-none::-webkit-scrollbar {
@@ -52,70 +75,157 @@
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
+    .glow-turf {
+      box-shadow: 0 0 25px -4px rgba(0, 210, 106, 0.35);
+    }
+    .glow-bms {
+      box-shadow: 0 0 25px -4px rgba(248, 68, 100, 0.35);
+    }
+    .glow-purple {
+      box-shadow: 0 0 25px -4px rgba(168, 85, 247, 0.35);
+    }
+    .glass-card {
+      background: rgba(19, 27, 46, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-header {
+      background: rgba(9, 13, 22, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-emerald-500 selection:text-slate-950">
+<body class="bg-[#090D16] text-slate-100 min-h-screen flex flex-col antialiased selection:bg-emerald-500 selection:text-slate-950">
 
-  <!-- Top App Navigation -->
-  <header class="sticky top-0 z-40 bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/80 px-4 md:px-8 py-3.5">
-    <div class="max-w-7xl mx-auto flex items-center justify-between">
-      
-      <!-- Brand Logo -->
-      <div id="nav-brand" class="flex items-center gap-3 cursor-pointer">
-        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-0.5 shadow-lg shadow-emerald-500/20 flex items-center justify-center">
-          <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center font-black text-emerald-400 text-lg">
-            ⚡
+  <!-- Top App Navigation (BookMyShow + Snabbit Header) -->
+  <header class="sticky top-0 z-40 glass-header border-b border-white/[0.08]">
+    <!-- Tier 1: Brand Logo, Location Selector, Omni Search & User Controls -->
+    <div class="max-w-7xl mx-auto px-4 md:px-8 py-3">
+      <div class="flex items-center justify-between gap-3 md:gap-6">
+        
+        <!-- Left: Brand Logo & BookMyShow-style City / Location Selector -->
+        <div class="flex items-center gap-3 lg:gap-5 shrink-0">
+          <!-- Brand Logo -->
+          <div id="nav-brand" class="flex items-center gap-2.5 cursor-pointer group">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-[#F84464] p-0.5 shadow-lg shadow-emerald-500/20 group-hover:shadow-emerald-500/40 transition flex items-center justify-center">
+              <div class="w-full h-full bg-[#090D16] rounded-[14px] flex items-center justify-center font-black text-emerald-400 text-lg group-hover:scale-105 transition-transform">
+                ⚡
+              </div>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xl font-black tracking-tight text-white group-hover:text-emerald-400 transition">APEX</span>
+                <span class="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">SPORTS</span>
+              </div>
+              <span class="text-[10px] text-slate-400 font-medium hidden sm:block tracking-wide">Thane • Mumbai • Navi Mumbai</span>
+            </div>
+          </div>
+
+          <!-- BookMyShow Style Location Selector Button & Dropdown -->
+          <div class="relative">
+            <button id="btn-location-selector" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-white/10 text-xs font-bold transition text-slate-200 hover:text-white" title="Change Location">
+              <span class="text-emerald-400">📍</span>
+              <span id="current-location-label" class="font-bold">Thane</span>
+              <span class="text-[10px] text-slate-400">▾</span>
+            </button>
+
+            <!-- Location Dropdown Flyout -->
+            <div id="location-dropdown-flyout" class="hidden absolute top-full mt-2 left-0 w-72 rounded-2xl bg-slate-900 border border-white/10 shadow-2xl p-3 z-50 animate-fade-in">
+              <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 pb-2 border-b border-slate-800">
+                Select Your Region
+              </div>
+              <div class="mt-2 space-y-1">
+                <button data-city="all" class="loc-option w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-slate-800 font-bold text-slate-300 hover:text-white flex items-center justify-between">
+                  <span>🌐 All Cities (Thane & Mumbai)</span>
+                  <span class="text-[10px] text-emerald-400">12 Turfs</span>
+                </button>
+                <button data-city="thane" class="loc-option w-full text-left px-3 py-2 rounded-xl text-xs bg-emerald-500/10 border border-emerald-500/30 font-bold text-emerald-400 flex items-center justify-between">
+                  <span>📍 Thane (Ghodbunder, Majiwada)</span>
+                  <span class="text-[10px] text-emerald-400">5 Turfs</span>
+                </button>
+                <button data-city="mumbai" class="loc-option w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-slate-800 font-bold text-slate-300 hover:text-white flex items-center justify-between">
+                  <span>📍 Mumbai (Bandra, Powai, BKC)</span>
+                  <span class="text-[10px] text-slate-400">5 Turfs</span>
+                </button>
+                <button data-city="navi mumbai" class="loc-option w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-slate-800 font-bold text-slate-300 hover:text-white flex items-center justify-between">
+                  <span>📍 Navi Mumbai (Vashi, Nerul)</span>
+                  <span class="text-[10px] text-slate-400">2 Turfs</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <span class="text-xl font-black tracking-tight text-white">APEX</span>
-            <span class="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">SPORTS</span>
+
+        <!-- Center: Global Omni-Search Bar (BookMyShow Style) -->
+        <div class="flex-1 max-w-xl hidden md:block">
+          <div class="relative">
+            <input id="header-omni-search" type="text" placeholder="Search turfs, box cricket, football, areas (Bandra, Ghodbunder)..." class="w-full bg-slate-900/90 hover:bg-slate-900 border border-white/10 hover:border-emerald-500/50 focus:border-emerald-500 text-white placeholder-slate-400 rounded-2xl pl-10 pr-12 py-2 text-xs focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition shadow-inner" />
+            <span class="absolute left-3.5 top-2.5 text-slate-400 text-xs">🔍</span>
+            <span class="absolute right-3 top-2 px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400 border border-slate-700">/</span>
           </div>
-          <span class="text-[11px] text-slate-400 font-medium hidden sm:block">Thane • Mumbai • Navi Mumbai</span>
         </div>
+
+        <!-- Right: Actions, Workflows, List Turf & User Switcher -->
+        <div class="flex items-center gap-2 shrink-0">
+          <button id="btn-header-scenarios" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition active:scale-95" title="Launch Interactive Workflow Demonstrator">
+            <span>⚡ Workflows</span>
+          </button>
+
+          <button id="btn-header-auth" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 text-xs font-black shadow-md shadow-emerald-500/20 transition active:scale-95">
+            <span>🔑 Login / Register</span>
+          </button>
+
+          <button id="btn-header-add-venue" class="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition">
+            <span>+ List Venue</span>
+          </button>
+
+          <button id="btn-quick-player" class="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-xs transition" title="Switch or Create User Profile">
+            <div id="header-user-avatar" class="w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-black text-[11px] flex items-center justify-center">
+              RD
+            </div>
+            <span id="header-user-name" class="font-bold text-white text-xs hidden lg:inline">Rohan</span>
+            <span id="header-user-role" class="text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-slate-800 text-emerald-400 hidden xl:inline">Player</span>
+            <span class="text-[10px] text-slate-400">▾</span>
+          </button>
+        </div>
+
       </div>
+    </div>
 
-      <!-- Navigation Tabs (Desktop) -->
-      <nav class="hidden md:flex items-center gap-1 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800">
-        <button id="tab-explore" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-emerald-500 text-slate-950 shadow-md">
-          Explore Venues
-        </button>
-        <button id="tab-bookings" class="px-4 py-2 rounded-xl text-xs font-bold transition text-slate-300 hover:text-white hover:bg-slate-800">
-          My Passes
-        </button>
-        <button id="tab-partner" class="px-4 py-2 rounded-xl text-xs font-bold transition text-slate-300 hover:text-white hover:bg-slate-800">
-          Partner Portal
-        </button>
-        <button id="tab-admin" class="px-4 py-2 rounded-xl text-xs font-bold transition text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5">
-          <span>⚙️ Telemetry</span>
-        </button>
-      </nav>
+    <!-- Tier 2: Sub-Navigation Ribbon (Tabs & Quick Neighborhoods) -->
+    <div class="border-t border-white/[0.06] bg-slate-950/60 px-4 md:px-8 py-2">
+      <div class="max-w-7xl mx-auto flex items-center justify-between gap-4 overflow-x-auto scrollbar-none">
+        
+        <!-- Navigation Tabs (Desktop) -->
+        <nav class="flex items-center gap-1 shrink-0">
+          <button id="tab-explore" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-emerald-500 text-slate-950 shadow-md">
+            🏟️ Explore Venues
+          </button>
+          <button id="tab-bookings" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition text-slate-300 hover:text-white hover:bg-slate-800">
+            🎟️ My Passes
+          </button>
+          <button id="tab-partner" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition text-slate-300 hover:text-white hover:bg-slate-800">
+            🏢 Partner Portal
+          </button>
+          <button id="tab-admin" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5">
+            <span>⚙️ Telemetry</span>
+          </button>
+        </nav>
 
-      <!-- Actions, List Venue & User Switcher -->
-      <div class="flex items-center gap-2">
-        <button id="btn-header-scenarios" class="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md transition" title="Launch Interactive Workflow Demonstrator">
-          <span>⚡ Workflows</span>
-        </button>
+        <!-- Micro-Neighborhood Quick Chips (BookMyShow / Snabbit Style) -->
+        <div class="hidden md:flex items-center gap-1.5 text-[11px] shrink-0 text-slate-400">
+          <span class="text-slate-500 font-semibold mr-1">Trending Areas:</span>
+          <button data-area="Ghodbunder" class="header-area-chip px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 hover:text-emerald-400 border border-white/5 transition">📍 Ghodbunder Rd</button>
+          <button data-area="Majiwada" class="header-area-chip px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 hover:text-emerald-400 border border-white/5 transition">📍 Majiwada</button>
+          <button data-area="Bandra" class="header-area-chip px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 hover:text-emerald-400 border border-white/5 transition">📍 Bandra West</button>
+          <button data-area="Powai" class="header-area-chip px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 hover:text-emerald-400 border border-white/5 transition">📍 Powai</button>
+          <button data-area="BKC" class="header-area-chip px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 hover:text-emerald-400 border border-white/5 transition">📍 BKC</button>
+          <button data-area="Vashi" class="header-area-chip px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 hover:text-emerald-400 border border-white/5 transition">📍 Vashi</button>
+        </div>
 
-        <button id="btn-header-auth" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black shadow-md transition">
-          <span>🔑 Login / Register</span>
-        </button>
-
-        <button id="btn-header-add-venue" class="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition">
-          <span>+ List Venue</span>
-        </button>
-
-        <button id="btn-quick-player" class="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs transition" title="Switch or Create User Profile">
-          <div id="header-user-avatar" class="w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-black text-[11px] flex items-center justify-center">
-            RD
-          </div>
-          <span id="header-user-name" class="font-bold text-white text-xs hidden sm:inline">Rohan</span>
-          <span id="header-user-role" class="text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-slate-800 text-emerald-400 hidden md:inline">Player</span>
-          <span class="text-[10px] text-slate-400">▾</span>
-        </button>
       </div>
-
     </div>
   </header>
 
@@ -126,8 +236,8 @@
     </div>
   </main>
 
-  <!-- Bottom Mobile Navigation Bar -->
-  <div class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800 px-4 py-2 flex items-center justify-around text-[10px] font-bold">
+  <!-- Bottom Mobile Navigation Bar (Snabbit / BookMyShow Style) -->
+  <div class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80 px-4 py-2 flex items-center justify-around text-[10px] font-bold">
     <button id="mobile-tab-explore" class="flex flex-col items-center gap-1 text-emerald-400">
       <span class="text-lg">🏟️</span>
       <span>Explore</span>
@@ -147,10 +257,13 @@
   </div>
 
   <!-- Footer -->
-  <footer class="bg-slate-950 border-t border-slate-900 py-8 px-4 text-xs text-slate-500">
+  <footer class="bg-slate-950/80 border-t border-slate-900 py-8 px-4 text-xs text-slate-500">
     <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
       <div class="space-y-1 text-center md:text-left">
-        <div class="font-bold text-slate-300">Project Apex: Unified Sports Facility Booking Platform</div>
+        <div class="font-bold text-slate-300 flex items-center justify-center md:justify-start gap-2">
+          <span>Project Apex</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">BookMyShow & Snabbit Look & Feel</span>
+        </div>
         <p>Targeting Thane, Mumbai, and Navi Mumbai urban athletic communities. 100% Firebase Spark Free Tier compliant.</p>
       </div>
       <div class="flex flex-wrap items-center justify-center gap-4 text-xs">
@@ -184,12 +297,14 @@
         this.currentView = 'explore';
         this.selectedVenue = null;
         this.activeBooking = null;
+        this.explorer = null;
         this.init();
       }
 
       init() {
         this.updateHeaderUser();
         this.bindNavEvents();
+        this.bindHeaderLocationAndSearch();
         this.bindLegalEvents();
         this.registerServiceWorker();
         this.renderView('explore');
@@ -209,8 +324,8 @@
         if (roleEl && user) {
           roleEl.textContent = user.role === 'venue_owner' ? 'Owner' : 'Player';
           roleEl.className = user.role === 'venue_owner'
-            ? 'text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-indigo-950 text-indigo-300 border border-indigo-800 hidden md:inline'
-            : 'text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 hidden md:inline';
+            ? 'text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-indigo-950 text-indigo-300 border border-indigo-800 hidden lg:inline'
+            : 'text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 hidden lg:inline';
         }
       }
 
@@ -224,10 +339,78 @@
         }
       }
 
+      bindHeaderLocationAndSearch() {
+        const locBtn = document.getElementById('btn-location-selector');
+        const locFlyout = document.getElementById('location-dropdown-flyout');
+        const locLabel = document.getElementById('current-location-label');
+        const omniSearch = document.getElementById('header-omni-search');
+
+        if (locBtn && locFlyout) {
+          locBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            locFlyout.classList.toggle('hidden');
+          });
+
+          document.addEventListener('click', () => {
+            locFlyout.classList.add('hidden');
+          });
+
+          locFlyout.querySelectorAll('.loc-option').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+              const city = e.currentTarget.getAttribute('data-city');
+              if (locLabel) {
+                locLabel.textContent = city === 'all' ? 'All Cities' : city.charAt(0).toUpperCase() + city.slice(1);
+              }
+              locFlyout.classList.add('hidden');
+
+              if (this.currentView !== 'explore') {
+                this.setTabActive('explore');
+              }
+              if (this.explorer) {
+                this.explorer.setCity(city);
+              }
+            });
+          });
+        }
+
+        // Omni-search input
+        if (omniSearch) {
+          omniSearch.addEventListener('input', (e) => {
+            const query = e.target.value;
+            if (this.currentView !== 'explore') {
+              this.setTabActive('explore');
+            }
+            if (this.explorer) {
+              this.explorer.setSearch(query);
+            }
+          });
+        }
+
+        // Quick area chips
+        document.querySelectorAll('.header-area-chip').forEach(chip => {
+          chip.addEventListener('click', (e) => {
+            const area = e.currentTarget.getAttribute('data-area');
+            if (this.currentView !== 'explore') {
+              this.setTabActive('explore');
+            }
+            if (this.explorer) {
+              this.explorer.setSearch(area);
+            }
+          });
+        });
+
+        // Keyboard shortcut "/" to focus omni-search
+        window.addEventListener('keydown', (e) => {
+          if (e.key === '/' && document.activeElement !== omniSearch && omniSearch) {
+            e.preventDefault();
+            omniSearch.focus();
+          }
+        });
+      }
+
       bindNavEvents() {
         const setTabActive = (tabName) => {
           this.currentView = tabName;
-          this.setTabActive = setTabActive;
           ['explore', 'bookings', 'partner', 'admin'].forEach(name => {
             const deskBtn = document.getElementById(`tab-${name}`);
             const mobBtn = document.getElementById(`mobile-tab-${name}`);
@@ -235,8 +418,8 @@
 
             if (deskBtn) {
               deskBtn.className = isActive
-                ? 'px-4 py-2 rounded-xl text-xs font-bold transition bg-emerald-500 text-slate-950 shadow-md'
-                : 'px-4 py-2 rounded-xl text-xs font-bold transition text-slate-300 hover:text-white hover:bg-slate-800';
+                ? 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-emerald-500 text-slate-950 shadow-md'
+                : 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition text-slate-300 hover:text-white hover:bg-slate-800';
             }
             if (mobBtn) {
               mobBtn.className = isActive
@@ -253,18 +436,6 @@
         document.getElementById('tab-bookings').addEventListener('click', () => setTabActive('bookings'));
         document.getElementById('tab-partner').addEventListener('click', () => setTabActive('partner'));
         document.getElementById('tab-admin').addEventListener('click', () => setTabActive('admin'));
-
-        const btnScenarios = document.getElementById('btn-header-scenarios');
-        if (btnScenarios) {
-          btnScenarios.addEventListener('click', () => {
-            ScenarioRunnerModal.show({
-              onStateUpdated: () => {
-                this.updateHeaderUser();
-                this.renderView(this.currentView);
-              }
-            });
-          });
-        }
 
         const btnScenarios = document.getElementById('btn-header-scenarios');
         if (btnScenarios) {
@@ -352,6 +523,7 @@
                 else this.renderView(view);
               }
             });
+            this.explorer = explorer;
             explorer.render(this.appRoot);
             break;
           }
