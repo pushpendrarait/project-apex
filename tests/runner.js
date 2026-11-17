@@ -206,6 +206,26 @@ async function runTests() {
   const newAvail = VenueService.getDailyAvailability(newCourts[0].courtId, '2026-11-28');
   assert(newAvail.slots['14:00'].isOddHour === true, 'Odd-hour pricing dynamically computed on new venue slots');
 
+  // 5. Test login via email or phone
+  const loggedInUser = UserService.login('pooja.patil@test.com');
+  assert(loggedInUser.uid === newUser.uid, 'Login by email succeeds and updates active session');
+
+  // 6. Test registering a Facility Owner with instant venue creation
+  const ownerReg = UserService.registerFacilityOwner({
+    displayName: 'Vikas Shinde',
+    phone: '+91 98333 44556',
+    email: 'vikas@shindeturf.com',
+    city: 'Thane',
+    facilityName: 'Shinde Pro Cricket Turf',
+    area: 'Majiwada',
+    sports: ['cricket'],
+    startingPrice: 1300
+  });
+  assert(ownerReg.user.role === 'venue_owner', 'Owner registered with role venue_owner');
+  assert(ownerReg.user.venueId === ownerReg.venue.venueId, 'Owner profile linked to newly provisioned facility');
+  assert(mockDb.data.venues[ownerReg.venue.venueId].name === 'Shinde Pro Cricket Turf', 'Facility provisioned and persisted in database');
+  assert(UserService.getCurrentUser().uid === ownerReg.user.uid, 'Active session switched to new facility owner');
+
   // Summary
   console.log('\n======================================================');
   console.log(`🏁 TEST RESULTS: ${passedTests}/${totalTests} PASSED (100%)`);

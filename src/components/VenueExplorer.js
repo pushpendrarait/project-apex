@@ -5,10 +5,13 @@
 
 import { VenueService } from '../services/venueService.js';
 import { AddVenueModal } from './AddVenueModal.js';
+import { UserAuthModal } from './UserAuthModal.js';
 
 export class VenueExplorer {
-  constructor({ onSelectVenue }) {
+  constructor({ onSelectVenue, onUserChanged, onNavigate }) {
     this.onSelectVenue = onSelectVenue;
+    this.onUserChanged = onUserChanged;
+    this.onNavigate = onNavigate;
     this.currentCity = 'all';
     this.currentSport = 'all';
     this.searchQuery = '';
@@ -34,11 +37,18 @@ export class VenueExplorer {
               Enjoy up to <strong class="text-emerald-400">35% OFF</strong> on dynamic odd-hour slots.
             </p>
 
-            <div class="flex flex-wrap items-center gap-3 pt-1">
-              <button id="btn-banner-add-venue" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition active:scale-95 flex items-center gap-2">
-                <span>🏢 List Your Turf / Court</span>
+            <!-- Landing Page Action Buttons: Sign In / Register as Player or Facility Owner -->
+            <div class="flex flex-wrap items-center gap-3 pt-2">
+              <button id="btn-hero-signin" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 shadow-md transition active:scale-95 flex items-center gap-2">
+                <span>🔑 Sign In</span>
               </button>
-              <span class="text-xs text-slate-400">Join Thane & Mumbai sports facility directory</span>
+              <button id="btn-hero-register-player" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition active:scale-95 flex items-center gap-2">
+                <span>🏏 Register as Player</span>
+                <span class="text-[10px] bg-slate-950/20 px-1.5 py-0.5 rounded font-mono font-bold">+100 Pts</span>
+              </button>
+              <button id="btn-hero-register-owner" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs shadow-lg shadow-indigo-600/20 transition active:scale-95 flex items-center gap-2">
+                <span>🏢 Register as Facility Owner</span>
+              </button>
             </div>
           </div>
 
@@ -101,8 +111,52 @@ export class VenueExplorer {
     const citySelect = container.querySelector('#filter-city');
     const sportSelect = container.querySelector('#filter-sport');
     const searchInput = container.querySelector('#filter-search');
-    const btnAddVenue = container.querySelector('#btn-banner-add-venue');
 
+    const btnSignin = container.querySelector('#btn-hero-signin');
+    if (btnSignin) {
+      btnSignin.addEventListener('click', () => {
+        UserAuthModal.show({
+          initialTab: 'signin',
+          onUserChanged: (user) => {
+            if (this.onUserChanged) this.onUserChanged(user);
+            this.updateGrid(container);
+          },
+          onNavigate: (view) => {
+            if (this.onNavigate) this.onNavigate(view);
+          }
+        });
+      });
+    }
+
+    const btnRegisterPlayer = container.querySelector('#btn-hero-register-player');
+    if (btnRegisterPlayer) {
+      btnRegisterPlayer.addEventListener('click', () => {
+        UserAuthModal.show({
+          initialTab: 'player',
+          onUserChanged: (user) => {
+            if (this.onUserChanged) this.onUserChanged(user);
+            this.updateGrid(container);
+          }
+        });
+      });
+    }
+
+    const btnRegisterOwner = container.querySelector('#btn-hero-register-owner');
+    if (btnRegisterOwner) {
+      btnRegisterOwner.addEventListener('click', () => {
+        UserAuthModal.show({
+          initialTab: 'owner',
+          onUserChanged: (user) => {
+            if (this.onUserChanged) this.onUserChanged(user);
+          },
+          onNavigate: (view) => {
+            if (this.onNavigate) this.onNavigate(view);
+          }
+        });
+      });
+    }
+
+    const btnAddVenue = container.querySelector('#btn-banner-add-venue');
     if (btnAddVenue) {
       btnAddVenue.addEventListener('click', () => {
         AddVenueModal.show({

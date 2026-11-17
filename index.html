@@ -94,6 +94,10 @@
 
       <!-- Actions, List Venue & User Switcher -->
       <div class="flex items-center gap-2">
+        <button id="btn-header-auth" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black shadow-md transition">
+          <span>🔑 Login / Register</span>
+        </button>
+
         <button id="btn-header-add-venue" class="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition">
           <span>+ List Venue</span>
         </button>
@@ -103,6 +107,7 @@
             RD
           </div>
           <span id="header-user-name" class="font-bold text-white text-xs hidden sm:inline">Rohan</span>
+          <span id="header-user-role" class="text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-slate-800 text-emerald-400 hidden md:inline">Player</span>
           <span class="text-[10px] text-slate-400">▾</span>
         </button>
       </div>
@@ -189,11 +194,18 @@
         const user = UserService.getCurrentUser();
         const avatar = document.getElementById('header-user-avatar');
         const nameEl = document.getElementById('header-user-name');
+        const roleEl = document.getElementById('header-user-role');
         if (avatar && user) {
           avatar.textContent = user.displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
         }
         if (nameEl && user) {
           nameEl.textContent = user.displayName.split(' ')[0];
+        }
+        if (roleEl && user) {
+          roleEl.textContent = user.role === 'venue_owner' ? 'Owner' : 'Player';
+          roleEl.className = user.role === 'venue_owner'
+            ? 'text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-indigo-950 text-indigo-300 border border-indigo-800 hidden md:inline'
+            : 'text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 hidden md:inline';
         }
       }
 
@@ -210,6 +222,7 @@
       bindNavEvents() {
         const setTabActive = (tabName) => {
           this.currentView = tabName;
+          this.setTabActive = setTabActive;
           ['explore', 'bookings', 'partner', 'admin'].forEach(name => {
             const deskBtn = document.getElementById(`tab-${name}`);
             const mobBtn = document.getElementById(`mobile-tab-${name}`);
@@ -228,12 +241,29 @@
           });
           this.renderView(tabName);
         };
+        this.setTabActive = setTabActive;
 
         document.getElementById('nav-brand').addEventListener('click', () => setTabActive('explore'));
         document.getElementById('tab-explore').addEventListener('click', () => setTabActive('explore'));
         document.getElementById('tab-bookings').addEventListener('click', () => setTabActive('bookings'));
         document.getElementById('tab-partner').addEventListener('click', () => setTabActive('partner'));
         document.getElementById('tab-admin').addEventListener('click', () => setTabActive('admin'));
+
+        const btnAuth = document.getElementById('btn-header-auth');
+        if (btnAuth) {
+          btnAuth.addEventListener('click', () => {
+            UserAuthModal.show({
+              initialTab: 'signin',
+              onUserChanged: (user) => {
+                this.updateHeaderUser();
+                this.renderView(this.currentView);
+              },
+              onNavigate: (view) => {
+                setTabActive(view);
+              }
+            });
+          });
+        }
 
         const btnAddVenue = document.getElementById('btn-header-add-venue');
         if (btnAddVenue) {
@@ -254,16 +284,13 @@
               onUserChanged: (user) => {
                 this.updateHeaderUser();
                 this.renderView(this.currentView);
+              },
+              onNavigate: (view) => {
+                setTabActive(view);
               }
             });
           });
         }
-
-        document.getElementById('mobile-tab-explore').addEventListener('click', () => setTabActive('explore'));
-        document.getElementById('mobile-tab-bookings').addEventListener('click', () => setTabActive('bookings'));
-        document.getElementById('mobile-tab-partner').addEventListener('click', () => setTabActive('partner'));
-        document.getElementById('mobile-tab-admin').addEventListener('click', () => setTabActive('admin'));
-      }
 
         document.getElementById('mobile-tab-explore').addEventListener('click', () => setTabActive('explore'));
         document.getElementById('mobile-tab-bookings').addEventListener('click', () => setTabActive('bookings'));
@@ -287,6 +314,13 @@
               onSelectVenue: (venue) => {
                 this.selectedVenue = venue;
                 this.renderView('slots');
+              },
+              onUserChanged: (user) => {
+                this.updateHeaderUser();
+              },
+              onNavigate: (view) => {
+                if (this.setTabActive) this.setTabActive(view);
+                else this.renderView(view);
               }
             });
             explorer.render(this.appRoot);
