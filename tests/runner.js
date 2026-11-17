@@ -12,6 +12,7 @@ import { BookingService } from '../src/services/bookingService.js';
 import { calculateSlotPrice, evaluateSlotTimeBand } from '../src/services/pricingEngine.js';
 import { CancellationService } from '../src/services/cancellationService.js';
 import { VenueService } from '../src/services/venueService.js';
+import { UserService } from '../src/services/userService.js';
 import { mockDb } from '../src/services/firebaseConfig.js';
 
 let passedTests = 0;
@@ -164,6 +165,46 @@ async function runTests() {
   const cancelResult = await CancellationService.cancelBooking(commitResult.booking.bookingId, 'demo_player');
   assert(cancelResult.success === true, 'Cancellation executed atomically');
   assert(mockDb.data.bookings[commitResult.booking.bookingId].status === 'CANCELLED', 'Booking status transitioned to CANCELLED');
+
+  // TEST SUITE 5: User & Venue Creation & Database Persistence
+  console.log('\n--- SUITE 5: User & Venue Creation & Persistence ---');
+  // 1. Create a new user (Player)
+  const newUser = UserService.createUser({
+    displayName: 'Pooja Patil',
+    phone: '+91 99887 76655',
+    email: 'pooja.patil@test.com',
+    role: 'player',
+    city: 'Thane'
+  });
+  assert(typeof newUser.uid === 'string', 'New user UID generated');
+  assert(newUser.loyaltyPoints === 100, 'New player awarded 100 welcome loyalty points');
+  assert(mockDb.data.users[newUser.uid].displayName === 'Pooja Patil', 'User profile persisted to database');
+  assert(UserService.getCurrentUser().uid === newUser.uid, 'Active user session updated to new user');
+
+  // 2. Create a new venue (Venue Partner)
+  const newVenue = VenueService.createVenue({
+    name: 'Thane Thunder Box Cricket Turf',
+    city: 'Thane',
+    area: 'Vartak Nagar',
+    address: 'Near Korum Mall, Vartak Nagar, Thane West 400606',
+    sports: ['cricket', 'football'],
+    amenities: ['Floodlights', 'Changing Rooms', 'Air-conditioned Dugout', 'Parking'],
+    startingPrice: 1100,
+    ownerId: newUser.uid
+  });
+  assert(typeof newVenue.venueId === 'string', 'New venue ID generated');
+  assert(mockDb.data.venues[newVenue.venueId].name === 'Thane Thunder Box Cricket Turf', 'Venue persisted to database');
+
+  // 3. Verify newly created venue is queryable via location filter
+  const thaneVenues = VenueService.getVenues({ city: 'Thane', sport: 'cricket' });
+  const foundVenue = thaneVenues.find(v => v.venueId === newVenue.venueId);
+  assert(foundVenue !== undefined, 'Newly created venue found in Thane cricket search');
+
+  // 4. Verify newly created court and availability document generation
+  const newCourts = VenueService.getCourtsForVenue(newVenue.venueId);
+  assert(newCourts.length >= 1, 'Initial pitch/court auto-generated for venue');
+  const newAvail = VenueService.getDailyAvailability(newCourts[0].courtId, '2026-11-28');
+  assert(newAvail.slots['14:00'].isOddHour === true, 'Odd-hour pricing dynamically computed on new venue slots');
 
   // Summary
   console.log('\n======================================================');

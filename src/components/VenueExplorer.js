@@ -4,6 +4,7 @@
  */
 
 import { VenueService } from '../services/venueService.js';
+import { AddVenueModal } from './AddVenueModal.js';
 
 export class VenueExplorer {
   constructor({ onSelectVenue }) {
@@ -32,6 +33,13 @@ export class VenueExplorer {
               Explore floodlit box cricket, FIFA-standard football, indoor badminton, and pickleball courts. 
               Enjoy up to <strong class="text-emerald-400">35% OFF</strong> on dynamic odd-hour slots.
             </p>
+
+            <div class="flex flex-wrap items-center gap-3 pt-1">
+              <button id="btn-banner-add-venue" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition active:scale-95 flex items-center gap-2">
+                <span>🏢 List Your Turf / Court</span>
+              </button>
+              <span class="text-xs text-slate-400">Join Thane & Mumbai sports facility directory</span>
+            </div>
           </div>
 
           <!-- Filter Controls -->
@@ -93,6 +101,17 @@ export class VenueExplorer {
     const citySelect = container.querySelector('#filter-city');
     const sportSelect = container.querySelector('#filter-sport');
     const searchInput = container.querySelector('#filter-search');
+    const btnAddVenue = container.querySelector('#btn-banner-add-venue');
+
+    if (btnAddVenue) {
+      btnAddVenue.addEventListener('click', () => {
+        AddVenueModal.show({
+          onVenueAdded: () => {
+            this.updateGrid(container);
+          }
+        });
+      });
+    }
 
     citySelect.addEventListener('change', (e) => {
       this.currentCity = e.target.value;

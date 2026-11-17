@@ -4,24 +4,22 @@
 
 import { BookingService } from '../services/bookingService.js';
 import { CancellationService } from '../services/cancellationService.js';
+import { UserService } from '../services/userService.js';
+import { UserAuthModal } from './UserAuthModal.js';
 import { mockDb } from '../services/firebaseConfig.js';
 
 export class PlayerPortal {
-  constructor({ onBack, onShowPass }) {
-    this.userId = 'demo_player';
+  constructor({ onBack, onShowPass, onUserChanged }) {
     this.onBack = onBack;
     this.onShowPass = onShowPass;
+    this.onUserChanged = onUserChanged;
   }
 
   render(container) {
-    const user = mockDb.data.users[this.userId] || {
-      displayName: "Rohan Deshmukh",
-      phone: "+91 98201 12345",
-      loyaltyPoints: 350,
-      referralCode: "ROHAN50"
-    };
-
-    const bookings = BookingService.getPlayerBookings(this.userId);
+    const user = UserService.getCurrentUser();
+    this.userId = user.uid;
+    const bookings = BookingService.getPlayerBookings(user.uid);
+    const initials = user.displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
     container.innerHTML = `
       <div class="space-y-6">
@@ -29,20 +27,33 @@ export class PlayerPortal {
         <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950 p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div class="flex items-center gap-4">
             <div class="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center font-black text-xl">
-              RD
+              ${initials}
             </div>
             <div>
-              <h2 class="text-xl font-black text-white">${user.displayName}</h2>
-              <p class="text-xs text-slate-400">${user.phone} • Thane, Maharashtra</p>
+              <div class="flex items-center gap-2">
+                <h2 class="text-xl font-black text-white">${user.displayName}</h2>
+                <span class="text-[10px] uppercase px-2 py-0.5 rounded font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                  ${user.role}
+                </span>
+              </div>
+              <p class="text-xs text-slate-400">${user.phone} • ${user.city || 'Thane'}, Maharashtra</p>
             </div>
           </div>
 
-          <div class="flex flex-wrap gap-3">
+          <div class="flex flex-wrap items-center gap-3">
             <div class="bg-slate-950/80 border border-slate-800 px-4 py-2 rounded-2xl">
               <span class="text-[10px] uppercase font-bold text-slate-400 block">Apex Loyalty Points</span>
-              <span class="text-base font-black text-emerald-400 font-mono">${user.loyaltyPoints} Pts</span>
+              <span class="text-base font-black text-emerald-400 font-mono">${user.loyaltyPoints || 0} Pts</span>
             </div>
             <div class="bg-slate-950/80 border border-slate-800 px-4 py-2 rounded-2xl">
+              <span class="text-[10px] uppercase font-bold text-slate-400 block">Referral Code</span>
+              <span class="text-base font-black text-amber-400 font-mono">${user.referralCode || 'APEX50'}</span>
+            </div>
+            <button id="btn-switch-account" class="px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white border border-slate-700 transition flex items-center gap-1.5">
+              <span>👤 Switch / Create User</span>
+            </button>
+          </div>
+        </div>
               <span class="text-[10px] uppercase font-bold text-slate-400 block">Referral Code</span>
               <span class="text-base font-black text-amber-400 font-mono">${user.referralCode}</span>
             </div>
@@ -116,6 +127,18 @@ export class PlayerPortal {
     container.querySelector('#btn-back-to-explore').addEventListener('click', () => {
       if (this.onBack) this.onBack();
     });
+
+    const btnSwitch = container.querySelector('#btn-switch-account');
+    if (btnSwitch) {
+      btnSwitch.addEventListener('click', () => {
+        UserAuthModal.show({
+          onUserChanged: (user) => {
+            this.render(container);
+            if (this.onUserChanged) this.onUserChanged(user);
+          }
+        });
+      });
+    }
 
     container.querySelectorAll('.btn-show-pass').forEach(btn => {
       btn.addEventListener('click', (e) => {

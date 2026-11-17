@@ -1,0 +1,134 @@
+/**
+ * Project Apex - User Management & Authentication Service
+ * Manages user creation, profile persistence, role assignment, and active sessions
+ */
+
+import { mockDb } from './firebaseConfig.js';
+
+const ACTIVE_USER_KEY = 'apex_active_user_id';
+
+export class UserService {
+  static activeUserUid = 'demo_player';
+
+  /**
+   * Retrieves the currently active logged-in user
+   */
+  static getCurrentUser() {
+    let activeUid = this.activeUserUid || 'demo_player';
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem(ACTIVE_USER_KEY);
+      if (stored && mockDb.data.users[stored]) {
+        activeUid = stored;
+      }
+    }
+    return mockDb.data.users[activeUid] || mockDb.data.users['demo_player'];
+  }
+
+  /**
+   * Switches the active logged-in user session
+   */
+  static setCurrentUser(uid) {
+    if (!mockDb.data.users[uid]) {
+      throw new Error(`User ID ${uid} does not exist in the database.`);
+    }
+    this.activeUserUid = uid;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(ACTIVE_USER_KEY, uid);
+    }
+    return mockDb.data.users[uid];
+  }
+
+  /**
+   * Retrieves all users registered in the system
+   */
+  static getAllUsers() {
+    return Object.values(mockDb.data.users);
+  }
+
+  /**
+   * Retrieves user by UID
+   */
+  static getUserById(uid) {
+    return mockDb.data.users[uid] || null;
+  }
+
+  /**
+   * Creates a new user profile and persists it to the database
+   */
+  static createUser({
+    displayName,
+    email,
+    phone,
+    role = 'player', // 'player' | 'venue_owner' | 'admin'
+    city = 'Thane',
+    venueId = null
+  }) {
+    if (!displayName || !displayName.trim()) {
+      throw new Error("Display Name is required.");
+    }
+    if (!phone || !phone.trim()) {
+      throw new Error("Phone number is required.");
+    }
+
+    const cleanName = displayName.trim();
+    const cleanPhone = phone.trim();
+    const cleanEmail = (email && email.trim()) || `${cleanName.toLowerCase().replace(/\s+/g, '.')}${Math.floor(10 + Math.random() * 90)}@apex.dev`;
+
+    // Generate unique UID
+    const slug = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const uid = `usr_${slug}_${Math.floor(1000 + Math.random() * 9000)}`;
+
+    // Generate referral code for players
+    const firstWord = cleanName.split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '');
+    const referralCode = `${firstWord.slice(0, 5)}${Math.floor(10 + Math.random() * 90)}`;
+
+    const newUser = {
+      uid,
+      displayName: cleanName,
+      email: cleanEmail,
+      phone: cleanPhone,
+      role,
+      city,
+      loyaltyPoints: role === 'player' ? 100 : 0, // 100 Welcome Points for players!
+      referralCode,
+      venueId: role === 'venue_owner' ? venueId : null,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    // Persist into database
+    mockDb.data.users[uid] = newUser;
+
+    // Append to audit log
+    mockDb.data.audit_logs.push({
+      logId: `audit_${Date.now()}`,
+      action: 'USER_CREATED',
+      actorId: uid,
+      resourceType: 'user',
+      resourceId: uid,
+      metadata: { role, city },
+      timestamp: Date.now()
+    });
+
+    mockDb.persist();
+
+    // Auto-login as the newly created user
+    this.setCurrentUser(uid);
+
+    return newUser;
+  }
+
+  /**
+   * Updates an existing user's details
+   */
+  static updateUser(uid, updates) {
+    const user = mockDb.data.users[uid];
+    if (!user) {
+      throw new Error(`User ${uid} not found.`);
+    }
+
+    Object.assign(user, updates, { updatedAt: Date.now() });
+    mockDb.persist();
+    return user;
+  }
+}

@@ -92,15 +92,18 @@
         </button>
       </nav>
 
-      <!-- User Chip & Fast Switcher -->
+      <!-- Actions, List Venue & User Switcher -->
       <div class="flex items-center gap-2">
-        <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs">
-          <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-          <span class="text-slate-300 font-medium">Spark Tier:</span>
-          <span class="font-mono text-emerald-400 font-bold">$0.00 / Free</span>
-        </div>
-        <button id="btn-quick-player" class="w-9 h-9 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-400 font-black text-xs flex items-center justify-center transition">
-          RD
+        <button id="btn-header-add-venue" class="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition">
+          <span>+ List Venue</span>
+        </button>
+
+        <button id="btn-quick-player" class="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs transition" title="Switch or Create User Profile">
+          <div id="header-user-avatar" class="w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-black text-[11px] flex items-center justify-center">
+            RD
+          </div>
+          <span id="header-user-name" class="font-bold text-white text-xs hidden sm:inline">Rohan</span>
+          <span class="text-[10px] text-slate-400">▾</span>
         </button>
       </div>
 
@@ -161,6 +164,9 @@
     import { VenueOwnerPortal } from './src/components/VenueOwnerPortal.js';
     import { AdminConsole } from './src/components/AdminConsole.js';
     import { LegalModal } from './src/components/LegalModal.js';
+    import { UserService } from './src/services/userService.js';
+    import { AddVenueModal } from './src/components/AddVenueModal.js';
+    import { UserAuthModal } from './src/components/UserAuthModal.js';
 
     class ApexApp {
       constructor() {
@@ -172,10 +178,23 @@
       }
 
       init() {
+        this.updateHeaderUser();
         this.bindNavEvents();
         this.bindLegalEvents();
         this.registerServiceWorker();
         this.renderView('explore');
+      }
+
+      updateHeaderUser() {
+        const user = UserService.getCurrentUser();
+        const avatar = document.getElementById('header-user-avatar');
+        const nameEl = document.getElementById('header-user-name');
+        if (avatar && user) {
+          avatar.textContent = user.displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+        }
+        if (nameEl && user) {
+          nameEl.textContent = user.displayName.split(' ')[0];
+        }
       }
 
       registerServiceWorker() {
@@ -215,7 +234,36 @@
         document.getElementById('tab-bookings').addEventListener('click', () => setTabActive('bookings'));
         document.getElementById('tab-partner').addEventListener('click', () => setTabActive('partner'));
         document.getElementById('tab-admin').addEventListener('click', () => setTabActive('admin'));
-        document.getElementById('btn-quick-player').addEventListener('click', () => setTabActive('bookings'));
+
+        const btnAddVenue = document.getElementById('btn-header-add-venue');
+        if (btnAddVenue) {
+          btnAddVenue.addEventListener('click', () => {
+            AddVenueModal.show({
+              onVenueAdded: (newVenue) => {
+                this.selectedVenue = newVenue;
+                setTabActive('explore');
+              }
+            });
+          });
+        }
+
+        const btnQuickPlayer = document.getElementById('btn-quick-player');
+        if (btnQuickPlayer) {
+          btnQuickPlayer.addEventListener('click', () => {
+            UserAuthModal.show({
+              onUserChanged: (user) => {
+                this.updateHeaderUser();
+                this.renderView(this.currentView);
+              }
+            });
+          });
+        }
+
+        document.getElementById('mobile-tab-explore').addEventListener('click', () => setTabActive('explore'));
+        document.getElementById('mobile-tab-bookings').addEventListener('click', () => setTabActive('bookings'));
+        document.getElementById('mobile-tab-partner').addEventListener('click', () => setTabActive('partner'));
+        document.getElementById('mobile-tab-admin').addEventListener('click', () => setTabActive('admin'));
+      }
 
         document.getElementById('mobile-tab-explore').addEventListener('click', () => setTabActive('explore'));
         document.getElementById('mobile-tab-bookings').addEventListener('click', () => setTabActive('bookings'));

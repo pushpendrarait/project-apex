@@ -5,6 +5,7 @@
 
 import { BookingService } from '../services/bookingService.js';
 import { VenueService } from '../services/venueService.js';
+import { AddVenueModal } from './AddVenueModal.js';
 import { mockDb } from '../services/firebaseConfig.js';
 
 export class VenueOwnerPortal {
@@ -14,7 +15,8 @@ export class VenueOwnerPortal {
   }
 
   render(container) {
-    const venue = VenueService.getVenueById(this.venueId);
+    const venue = VenueService.getVenueById(this.venueId) || Object.values(mockDb.data.venues)[0];
+    this.venueId = venue.venueId;
     const courts = VenueService.getCourtsForVenue(this.venueId);
     const bookings = BookingService.getVenueBookings(this.venueId);
 
@@ -29,10 +31,13 @@ export class VenueOwnerPortal {
               🏢 Partner Portal
             </div>
             <h2 class="text-2xl font-black text-white">${venue.name}</h2>
-            <p class="text-xs text-slate-400">${venue.area}, ${venue.city} • Managed by Santosh Kadam</p>
+            <p class="text-xs text-slate-400">${venue.area}, ${venue.city} • Managed by Partner</p>
           </div>
 
-          <div class="flex items-center gap-3">
+          <div class="flex flex-wrap items-center gap-3">
+            <button id="btn-owner-add-venue" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition flex items-center gap-1.5">
+              <span>+ Add New Facility</span>
+            </button>
             <button id="btn-back-owner" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition">
               ← Switch to Player View
             </button>
@@ -106,6 +111,18 @@ export class VenueOwnerPortal {
     container.querySelector('#btn-back-owner').addEventListener('click', () => {
       if (this.onBack) this.onBack();
     });
+
+    const btnAddVenue = container.querySelector('#btn-owner-add-venue');
+    if (btnAddVenue) {
+      btnAddVenue.addEventListener('click', () => {
+        AddVenueModal.show({
+          onVenueAdded: (newVenue) => {
+            this.venueId = newVenue.venueId;
+            this.render(container);
+          }
+        });
+      });
+    }
 
     const btnVerify = container.querySelector('#btn-verify-token');
     const inputToken = container.querySelector('#input-gate-token');

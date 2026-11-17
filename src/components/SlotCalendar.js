@@ -5,6 +5,7 @@
 
 import { VenueService } from '../services/venueService.js';
 import { ConcurrencyService } from '../services/concurrencyService.js';
+import { UserService } from '../services/userService.js';
 import { calculateSlotPrice } from '../services/pricingEngine.js';
 
 export class SlotCalendar {
@@ -253,12 +254,13 @@ export class SlotCalendar {
         btnLock.innerHTML = `<span class="animate-spin inline-block mr-2">⏳</span> Acquiring Atomic Lock...`;
 
         try {
+          const currentUser = UserService.getCurrentUser();
           // Acquire Phase 1 5-minute atomic lock
           const lockResult = await ConcurrencyService.acquireLock({
             courtId: this.selectedCourt.courtId,
             date: this.selectedDate,
             slot: this.selectedSlot,
-            userId: 'demo_player'
+            userId: currentUser.uid
           });
 
           const pricing = calculateSlotPrice({

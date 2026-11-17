@@ -28,6 +28,155 @@ export class VenueService {
   }
 
   /**
+   * Creates a new sports venue facility and persists it to the database
+   */
+  static createVenue({
+    name,
+    city = 'Thane',
+    area,
+    address,
+    sports = ['cricket'],
+    amenities = ['Floodlights', 'Changing Rooms', 'Parking'],
+    startingPrice = 1000,
+    images = [],
+    ownerId = 'demo_owner',
+    courts = []
+  }) {
+    if (!name || !name.trim()) {
+      throw new Error("Venue Name is required.");
+    }
+    if (!area || !area.trim()) {
+      throw new Error("Area / Locality is required.");
+    }
+
+    const cleanName = name.trim();
+    const slug = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const venueId = `venue_${slug}_${Math.floor(100 + Math.random() * 900)}`;
+
+    const defaultImages = [
+      "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80"
+    ];
+
+    const newVenue = {
+      venueId,
+      name: cleanName,
+      city: city.charAt(0).toUpperCase() + city.slice(1),
+      area: area.trim(),
+      address: address ? address.trim() : `${area.trim()}, ${city}, Maharashtra`,
+      coordinates: { lat: 19.2183, lng: 72.9781 },
+      sports: sports.length > 0 ? sports : ['cricket'],
+      amenities: amenities.length > 0 ? amenities : ['Floodlights', 'Changing Rooms'],
+      rating: 5.0,
+      reviewsCount: 1,
+      startingPrice: Number(startingPrice) || 1000,
+      featured: true,
+      ownerId,
+      status: 'ACTIVE',
+      images: images.length > 0 ? images : defaultImages,
+      createdAt: Date.now()
+    };
+
+    // Save venue to database
+    mockDb.data.venues[venueId] = newVenue;
+
+    // Create associated courts/pitches
+    if (courts && courts.length > 0) {
+      courts.forEach((c, index) => {
+        this.addCourt({
+          venueId,
+          name: c.name || `Court ${index + 1}`,
+          sport: c.sport || sports[0] || 'cricket',
+          surface: c.surface || 'Artificial Grass Turf',
+          dimensions: c.dimensions || '100ft x 60ft',
+          baseHourlyRate: Number(c.baseHourlyRate) || Number(startingPrice) || 1000,
+          peakHourlyRate: Number(c.peakHourlyRate) || Math.round((Number(startingPrice) || 1000) * 1.3),
+          oddHourDiscountPct: Number(c.oddHourDiscountPct) || 30
+        });
+      });
+    } else {
+      // Default initial court
+      this.addCourt({
+        venueId,
+        name: `${cleanName} Main Pitch`,
+        sport: sports[0] || 'cricket',
+        surface: 'Professional Artificial Turf',
+        dimensions: '110ft x 65ft',
+        baseHourlyRate: Number(startingPrice) || 1000,
+        peakHourlyRate: Math.round((Number(startingPrice) || 1000) * 1.3),
+        oddHourDiscountPct: 35
+      });
+    }
+
+    // Append to audit logs
+    mockDb.data.audit_logs.push({
+      logId: `audit_${Date.now()}`,
+      action: 'VENUE_CREATED',
+      actorId: ownerId,
+      resourceType: 'venue',
+      resourceId: venueId,
+      metadata: { name: cleanName, city, sports },
+      timestamp: Date.now()
+    });
+
+    mockDb.persist();
+    return newVenue;
+  }
+
+  /**
+   * Adds a court/pitch to an existing venue
+   */
+  static addCourt({
+    venueId,
+    name,
+    sport = 'cricket',
+    surface = 'Artificial Turf',
+    dimensions = '100ft x 60ft',
+    baseHourlyRate = 1000,
+    peakHourlyRate = 1400,
+    oddHourDiscountPct = 30
+  }) {
+    const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const courtId = `court_${venueId}_${slug}_${Math.floor(100 + Math.random() * 900)}`;
+
+    const newCourt = {
+      courtId,
+      venueId,
+      name,
+      sport: sport.toLowerCase(),
+      surface,
+      dimensions,
+      baseHourlyRate: Number(baseHourlyRate),
+      peakHourlyRate: Number(peakHourlyRate),
+      oddHourDiscountPct: Number(oddHourDiscountPct)
+    };
+
+    mockDb.data.courts[courtId] = newCourt;
+    mockDb.persist();
+    return newCourt;
+  }
+
+  /**
+   * Deletes a venue from the database
+   */
+  static deleteVenue(venueId) {
+    if (mockDb.data.venues[venueId]) {
+      delete mockDb.data.venues[venueId];
+
+      // Remove associated courts
+      Object.keys(mockDb.data.courts).forEach(courtId => {
+        if (mockDb.data.courts[courtId].venueId === venueId) {
+          delete mockDb.data.courts[courtId];
+        }
+      });
+
+      mockDb.persist();
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Retrieves courts for a given venue
    */
   static getCourtsForVenue(venueId) {

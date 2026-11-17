@@ -5,6 +5,7 @@
 
 import { ConcurrencyService } from '../services/concurrencyService.js';
 import { BookingService } from '../services/bookingService.js';
+import { UserService } from '../services/userService.js';
 import { calculateSlotPrice } from '../services/pricingEngine.js';
 
 export class CheckoutModal {
@@ -88,7 +89,7 @@ export class CheckoutModal {
           </div>
           <div class="flex justify-between text-slate-300">
             <span>Player:</span>
-            <span>Rohan Deshmukh (+91 98201 12345)</span>
+            <span>${UserService.getCurrentUser().displayName} (${UserService.getCurrentUser().phone})</span>
           </div>
         </div>
 
@@ -196,11 +197,12 @@ export class CheckoutModal {
 
     // Cancel / Release Lock
     modal.querySelector('#btn-cancel-checkout').addEventListener('click', async () => {
+      const currentUser = UserService.getCurrentUser();
       await ConcurrencyService.releaseLock({
         courtId: this.context.court.courtId,
         date: this.context.date,
         slot: this.context.slot,
-        userId: 'demo_player'
+        userId: currentUser.uid
       });
       this.close();
       if (this.onCancel) this.onCancel();
@@ -213,10 +215,11 @@ export class CheckoutModal {
       btnPay.innerHTML = `<span class="animate-spin mr-2">⏳</span> Processing Atomic Commit...`;
 
       try {
+        const currentUser = UserService.getCurrentUser();
         const result = await BookingService.commitBooking({
-          userId: 'demo_player',
-          userName: 'Rohan Deshmukh',
-          userPhone: '+91 98201 12345',
+          userId: currentUser.uid,
+          userName: currentUser.displayName,
+          userPhone: currentUser.phone,
           venueId: this.context.venue.venueId,
           venueName: this.context.venue.name,
           courtId: this.context.court.courtId,
