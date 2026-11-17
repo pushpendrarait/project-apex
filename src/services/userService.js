@@ -115,7 +115,10 @@ export class UserService {
     phone,
     role = 'player', // 'player' | 'venue_owner' | 'admin'
     city = 'Thane',
-    venueId = null
+    venueId = null,
+    isPhoneVerified = true,
+    isEmailVerified = true,
+    otpSessionId = null
   }) {
     if (!displayName || !displayName.trim()) {
       throw new Error("Display Name is required.");
@@ -143,6 +146,9 @@ export class UserService {
       phone: cleanPhone,
       role,
       city,
+      isPhoneVerified: !!isPhoneVerified,
+      isEmailVerified: !!isEmailVerified,
+      otpSessionId,
       loyaltyPoints: role === 'player' ? 100 : 0, // 100 Welcome Points for players!
       referralCode,
       venueId: role === 'venue_owner' ? venueId : null,
@@ -160,7 +166,7 @@ export class UserService {
       actorId: uid,
       resourceType: 'user',
       resourceId: uid,
-      metadata: { role, city },
+      metadata: { role, city, isPhoneVerified, isEmailVerified },
       timestamp: Date.now()
     });
 
@@ -185,7 +191,10 @@ export class UserService {
     address,
     sports = ['cricket', 'football'],
     startingPrice = 1200,
-    amenities = ['Floodlights', 'Changing Rooms', 'Air-conditioned Dugout', 'Parking']
+    amenities = ['Floodlights', 'Changing Rooms', 'Air-conditioned Dugout', 'Parking'],
+    isPhoneVerified = true,
+    isEmailVerified = true,
+    otpSessionId = null
   }) {
     if (!facilityName || !facilityName.trim()) {
       throw new Error("Facility / Turf Name is required.");
@@ -200,7 +209,10 @@ export class UserService {
       phone,
       email,
       role: 'venue_owner',
-      city
+      city,
+      isPhoneVerified,
+      isEmailVerified,
+      otpSessionId
     });
 
     // 2. Provision and persist the new sports venue in the database

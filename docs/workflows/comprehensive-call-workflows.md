@@ -75,20 +75,30 @@ sequenceDiagram
     autonumber
     actor Player as Player (Client)
     participant AuthModal as UserAuthModal
+    participant OtpSvc as OtpService
     participant UserSvc as UserService
-    participant Firestore as Firestore (/users & /audit_logs)
+    participant Firestore as Firestore (/users, /otp_verifications, /audit_logs)
     participant Storage as LocalStorage / State
 
     Player->>AuthModal: Clicks "Sign In / Register" -> Selects "New Player"
-    AuthModal->>Player: Prompts for Display Name, Phone (+91), Email (optional), City
+    AuthModal->>Player: Prompts for Full Name, Mobile (+91), Email, City
     Player->>AuthModal: Submits Registration Form
-    AuthModal->>UserSvc: createUser({ displayName, phone, email, role: 'player', city })
-    UserSvc->>UserSvc: Validate phone (+91 10-digit), generate unique UID (usr_slug_rand)
-    UserSvc->>UserSvc: Generate custom referral code (e.g. ROHAN50) & allocate 100 Welcome Points
+    AuthModal->>OtpSvc: sendRegistrationOtp({ phone, email, displayName })
+    OtpSvc->>OtpSvc: Generate 6-digit Mobile OTP & 6-digit Email Code
+    OtpSvc->>Firestore: Set /otp_verifications/{sessionId} (5-minute TTL lease)
+    OtpSvc->>Firestore: Append /audit_logs (OTP_DISPATCHED)
+    OtpSvc-->>AuthModal: Dispatches simulated SMS preview & Email preview cards
+    AuthModal->>Player: Displays Dual OTP Verification Modal (5:00 countdown, SMS & Email inputs)
+    Player->>AuthModal: Enters Mobile SMS OTP + Email Verification Code
+    AuthModal->>OtpSvc: verifyRegistrationOtp({ sessionId, phoneOtp, emailOtp })
+    OtpSvc->>Firestore: Validate codes, TTL lease, mark session VERIFIED
+    OtpSvc->>Firestore: Append /audit_logs (OTP_VERIFIED_SUCCESS)
+    AuthModal->>UserSvc: createUser({ displayName, phone, email, role: 'player', city, isPhoneVerified: true, isEmailVerified: true, otpSessionId })
+    UserSvc->>UserSvc: Generate unique UID (usr_slug_rand) & 100 Welcome Points
     UserSvc->>Firestore: Set /users/{uid} document
     UserSvc->>Firestore: Append /audit_logs/{logId} (action: 'USER_CREATED')
     UserSvc->>Storage: Persist active session ('apex_active_user_id')
-    UserSvc-->>AuthModal: Return user profile
+    UserSvc-->>AuthModal: Return verified user profile
     AuthModal-->>Player: Display Welcome Toast & Show 100 Apex Points Balance
 ```
 
@@ -97,22 +107,36 @@ sequenceDiagram
 2. **Form Entry & Client Validation:**
    - `displayName`: Minimum 2 characters, trimmed.
    - `phone`: Standardized Indian mobile format (`+91` prefix optional, validated for 10 digits).
-   - `email`: If omitted, automatically derived as `{firstname}.{random}@apex.dev`.
+   - `email`: Valid email syntax required (`user@domain.ext`).
    - `city`: Standardized to metropolitan cluster (`Thane`, `Mumbai`, `Navi Mumbai`).
-3. **Data Generation:**
+3. **Dual OTP Dispatch (Mobile + Email):**
+   - Cryptographically generates two separate 6-digit numeric codes:
+     - **Mobile SMS OTP:** e.g., `357276`
+     - **Email Verification Code:** e.g., `902500`
+   - Dispatches a 5-minute atomic lease session stored in `/otp_verifications/{sessionId}`.
+   - Triggers simulated SMS & Email preview notifications with 1-click test auto-fill buttons.
+4. **Dual OTP Verification:**
+   - Player inputs both 6-digit codes.
+   - `OtpService.verifyRegistrationOtp` validates both codes concurrently within the 300-second TTL.
+   - Protects against brute-force attacks by locking the session after 3 consecutive failed attempts.
+5. **Data Generation & Persistence:**
    - Document ID: `usr_{slug}_{random4}` (e.g., `usr_rohan_deshmukh_4819`).
    - Referral Code: First name uppercase up to 5 characters + 2-digit integer (e.g., `ROHAN82`).
    - Welcome Incentive: Initial `loyaltyPoints` credited with `100` points.
-4. **Database Mutation:**
+   - Verification Flags: `isPhoneVerified: true`, `isEmailVerified: true`, `otpSessionId: sessionId`.
+6. **Database Mutation:**
    - Creates document at `/users/{uid}` with:
      ```json
      {
        "uid": "usr_rohan_deshmukh_4819",
        "displayName": "Rohan Deshmukh",
        "email": "rohan.deshmukh@apex.dev",
-       "phone": "+919820199182",
+       "phone": "+91 98201 99182",
        "role": "player",
        "city": "Thane",
+       "isPhoneVerified": true,
+       "isEmailVerified": true,
+       "otpSessionId": "otp_sess_rohan_deshmukh_4819",
        "loyaltyPoints": 100,
        "referralCode": "ROHAN82",
        "venueId": null,
@@ -120,8 +144,8 @@ sequenceDiagram
        "updatedAt": 1795000000000
      }
      ```
-   - Appends audit log to `/audit_logs/audit_{timestamp}` with action `USER_CREATED`.
-5. **Session Initiation:**
+   - Appends audit log to `/audit_logs/audit_{timestamp}` with actions `OTP_DISPATCHED`, `OTP_VERIFIED_SUCCESS`, and `USER_CREATED`.
+7. **Session Initiation:**
    - Writes `apex_active_user_id` to browser `localStorage`.
    - System updates application-wide header rendering player initials, role badge, and loyalty balance.
 
@@ -157,15 +181,23 @@ sequenceDiagram
     autonumber
     actor Owner as Facility Partner
     participant AuthModal as UserAuthModal
+    participant OtpSvc as OtpService
     participant UserSvc as UserService
     participant VenueSvc as VenueService
-    participant Firestore as Firestore (/users, /venues, /courts, /audit_logs)
+    participant Firestore as Firestore (/users, /venues, /courts, /otp_verifications, /audit_logs)
 
     Owner->>AuthModal: Clicks "Facility Owner" Registration Tab
     AuthModal->>Owner: Displays Partner Form (Owner Info + Facility Details)
-    Owner->>AuthModal: Inputs: Santosh, Phone, "Apex Arena Ghodbunder", Thane, Cricket/Football, Starting Price ₹1200
-    AuthModal->>UserSvc: registerFacilityOwner(partnerDetails)
-    UserSvc->>UserSvc: Create Owner Profile (role: 'venue_owner')
+    Owner->>AuthModal: Inputs: Santosh, Mobile (+91), Email, "Apex Arena Ghodbunder", Thane, Cricket/Football, Base Rate ₹1200
+    AuthModal->>OtpSvc: sendRegistrationOtp({ phone, email, displayName })
+    OtpSvc->>Firestore: Store 5-minute session in /otp_verifications/{sessionId}
+    OtpSvc-->>AuthModal: Dispatches Dual OTP preview cards (SMS + Email)
+    AuthModal->>Owner: Displays Dual OTP Verification Modal (5:00 countdown)
+    Owner->>AuthModal: Inputs Mobile SMS OTP + Email Verification Code
+    AuthModal->>OtpSvc: verifyRegistrationOtp({ sessionId, phoneOtp, emailOtp })
+    OtpSvc->>Firestore: Validate codes, update status to VERIFIED
+    AuthModal->>UserSvc: registerFacilityOwner({ partnerDetails, isPhoneVerified: true, isEmailVerified: true, otpSessionId })
+    UserSvc->>UserSvc: Create Owner Profile (role: 'venue_owner', verified)
     UserSvc->>Firestore: Set /users/{uid}
     UserSvc->>VenueSvc: createVenue({ name, city, area, sports, startingPrice, ownerId })
     VenueSvc->>VenueSvc: Generate venueId (venue_slug_rand) & set rating: 5.0, status: 'ACTIVE'
@@ -182,11 +214,14 @@ sequenceDiagram
 1. **Partner Onboarding Initiation:**
    - Owner accesses `UserAuthModal` -> selects "🏢 Facility Owner" tab or clicks "+ Add Facility" in navigation.
 2. **Input Ingestion & Validation:**
-   - Owner Details: Name (`Santosh Patil`), Phone (`+919811223344`), Email.
+   - Owner Details: Name (`Santosh Patil`), Mobile (`+91 98112 23344`), Email (`santosh@apexarena.in`).
    - Facility Details: Facility Name (`Apex Arena Ghodbunder`), Area (`Ghodbunder Road`), City (`Thane`), Base Starting Price (`₹1,200/hr`), Sports supported (`Cricket`, `Football`), Standard Amenities (`Floodlights`, `Changing Rooms`, `Parking`, `Dugout`).
-3. **Owner Profile Creation:**
-   - Generates `usr_santosh_patil_{random4}` in `/users/{uid}` with `role: "venue_owner"`.
-4. **Automated Venue Provisioning:**
+3. **Dual OTP Verification:**
+   - Dispatches 6-digit Mobile SMS OTP and 6-digit Email Verification Code.
+   - Owner verifies both within 5-minute lease period before account and facility provisioning occurs.
+4. **Owner Profile Creation:**
+   - Generates `usr_santosh_patil_{random4}` in `/users/{uid}` with `role: "venue_owner"`, `isPhoneVerified: true`, `isEmailVerified: true`, and `otpSessionId`.
+5. **Automated Venue Provisioning:**
    - Creates document `/venues/{venueId}`:
      ```json
      {

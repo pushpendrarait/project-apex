@@ -9,6 +9,7 @@ import { ConcurrencyService } from '../services/concurrencyService.js';
 import { BookingService } from '../services/bookingService.js';
 import { CancellationService } from '../services/cancellationService.js';
 import { calculateSlotPrice } from '../services/pricingEngine.js';
+import { OtpService } from '../services/otpService.js';
 import { mockDb } from '../services/firebaseConfig.js';
 
 export class ScenarioRunnerModal {
@@ -202,38 +203,81 @@ export class ScenarioRunnerModal {
       }
     };
 
-    // SCENARIO 1: Player Onboarding
+    // SCENARIO 1: Player Onboarding with Dual Mobile & Email OTP
     const runScenario1 = async () => {
       setBadge(1, 'RUNNING', 'running');
-      log('Starting Scenario 1: User (Player) Registration Flow...');
-      const uid = `usr_demo_${Date.now()}`;
-      const user = UserService.createUser({
+      log('Starting Scenario 1: User (Player) Registration Flow with Dual OTP...');
+
+      log('Step 1: Dispatching Dual Mobile SMS & Email Verification OTPs...');
+      const otpRes = await OtpService.sendRegistrationOtp({
         displayName: 'Aarav Mehta',
         phone: '+91 98200 88990',
-        email: 'aarav.mehta@example.com',
+        email: 'aarav.mehta@example.com'
+      });
+      log(`Dispatched: Mobile SMS OTP: [${otpRes.phoneOtp}] to ${otpRes.phone}`, 'pass');
+      log(`Dispatched: Email Verification Code: [${otpRes.emailOtp}] to ${otpRes.email}`, 'pass');
+
+      log('Step 2: Simulating Dual OTP Verification...');
+      const verifyRes = OtpService.verifyRegistrationOtp({
+        sessionId: otpRes.sessionId,
+        phoneOtp: otpRes.phoneOtp,
+        emailOtp: otpRes.emailOtp
+      });
+      log('Verified: Both Mobile & Email OTPs matched and authenticated!', 'pass');
+
+      log('Step 3: Creating verified player profile in /users collection...');
+      const user = UserService.createUser({
+        displayName: 'Aarav Mehta',
+        phone: otpRes.phone,
+        email: otpRes.email,
         city: 'Thane',
-        role: 'player'
+        role: 'player',
+        isPhoneVerified: true,
+        isEmailVerified: true,
+        otpSessionId: verifyRes.sessionId
       });
       log(`Player created: ${user.displayName} (UID: ${user.uid})`, 'pass');
+      log(`Credentials verified: isPhoneVerified=true, isEmailVerified=true`, 'pass');
       log(`Welcome bonus verified: ${user.loyaltyPoints} Loyalty Points awarded`, 'pass');
       log(`Active session updated. User profile persisted in mockDb.data.users.`, 'pass');
       setBadge(1, 'PASSED', 'pass');
       if (onStateUpdated) onStateUpdated();
     };
 
-    // SCENARIO 2: Partner Onboarding
+    // SCENARIO 2: Partner Onboarding with Dual OTP
     const runScenario2 = async () => {
       setBadge(2, 'RUNNING', 'running');
-      log('Starting Scenario 2: Facility Partner Registration Flow...');
-      const res = UserService.registerFacilityOwner({
+      log('Starting Scenario 2: Facility Partner Registration Flow with Dual OTP...');
+
+      log('Step 1: Partner enters details & requests Dual OTPs...');
+      const ownerOtp = await OtpService.sendRegistrationOtp({
         displayName: 'Kunal Patil',
         phone: '+91 98111 22334',
-        email: 'kunal@patilturf.com',
+        email: 'kunal@patilturf.com'
+      });
+      log(`Dispatched: Mobile OTP: [${ownerOtp.phoneOtp}] | Email Code: [${ownerOtp.emailOtp}]`, 'pass');
+
+      log('Step 2: Verifying partner OTP credentials...');
+      const ownerVer = OtpService.verifyRegistrationOtp({
+        sessionId: ownerOtp.sessionId,
+        phoneOtp: ownerOtp.phoneOtp,
+        emailOtp: ownerOtp.emailOtp
+      });
+      log('Verified: Partner credentials confirmed via dual OTP!', 'pass');
+
+      log('Step 3: Provisioning Facility and linking verified owner profile...');
+      const res = UserService.registerFacilityOwner({
+        displayName: 'Kunal Patil',
+        phone: ownerOtp.phone,
+        email: ownerOtp.email,
         city: 'Thane',
         facilityName: 'Patil Champions Turf',
         area: 'Vartak Nagar',
         sports: ['cricket', 'football'],
-        startingPrice: 1200
+        startingPrice: 1200,
+        isPhoneVerified: true,
+        isEmailVerified: true,
+        otpSessionId: ownerVer.sessionId
       });
       log(`Partner registered: ${res.user.displayName} (Role: ${res.user.role})`, 'pass');
       log(`Facility provisioned: ${res.venue.name} (Venue ID: ${res.venue.venueId})`, 'pass');

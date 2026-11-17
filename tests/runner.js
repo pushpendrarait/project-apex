@@ -13,6 +13,7 @@ import { calculateSlotPrice, evaluateSlotTimeBand } from '../src/services/pricin
 import { CancellationService } from '../src/services/cancellationService.js';
 import { VenueService } from '../src/services/venueService.js';
 import { UserService } from '../src/services/userService.js';
+import { OtpService } from '../src/services/otpService.js';
 import { mockDb } from '../src/services/firebaseConfig.js';
 
 let passedTests = 0;
@@ -349,6 +350,99 @@ async function runTests() {
   // WF6: 3-Tier Cancellation & Refunds
   const wf6RefundPreview = CancellationService.previewRefund(wf4Commit.booking);
   assert(wf6RefundPreview.tier >= 1 && typeof wf6RefundPreview.refundAmount === 'number', 'WF6 [3-Tier Cancellation]: Refund tier calculated dynamically');
+
+  // TEST SUITE 8: Dual Mobile & Email OTP Authentication
+  console.log('\n--- SUITE 8: Dual Mobile & Email OTP Authentication ---');
+  
+  // 1. Validation of phone and email
+  let invalidPhoneRejected = false;
+  try {
+    await OtpService.sendRegistrationOtp({ phone: '123', email: 'valid@example.com' });
+  } catch (err) {
+    invalidPhoneRejected = true;
+    assert(err.message.includes('valid 10-digit mobile number'), 'Rejects invalid phone number format');
+  }
+  assert(invalidPhoneRejected, 'Invalid mobile number prevented from dispatching OTP');
+
+  let invalidEmailRejected = false;
+  try {
+    await OtpService.sendRegistrationOtp({ phone: '+91 99887 76655', email: 'not-an-email' });
+  } catch (err) {
+    invalidEmailRejected = true;
+    assert(err.message.includes('valid email address'), 'Rejects invalid email address format');
+  }
+  assert(invalidEmailRejected, 'Invalid email prevented from dispatching OTP');
+
+  // 2. Dispatch dual registration OTPs
+  const otpDispatch = await OtpService.sendRegistrationOtp({
+    displayName: 'Pooja Kulkarni',
+    phone: '+91 98333 99887',
+    email: 'pooja.kulkarni@sports.in'
+  });
+  assert(otpDispatch.success === true, 'Dual OTP dispatch succeeds');
+  assert(otpDispatch.sessionId && otpDispatch.sessionId.startsWith('otp_reg_'), 'Generates unique OTP session ID');
+  assert(typeof otpDispatch.phoneOtp === 'string' && otpDispatch.phoneOtp.length === 6, 'Generates 6-digit Mobile SMS OTP');
+  assert(typeof otpDispatch.emailOtp === 'string' && otpDispatch.emailOtp.length === 6, 'Generates 6-digit Email Verification Code');
+  assert(otpDispatch.expiresInSeconds === 300, 'Enforces 5-minute (300s) TTL lease for OTP');
+
+  // 3. Reject wrong Mobile OTP
+  let wrongMobileOtpRejected = false;
+  try {
+    OtpService.verifyRegistrationOtp({
+      sessionId: otpDispatch.sessionId,
+      phoneOtp: '000000',
+      emailOtp: otpDispatch.emailOtp
+    });
+  } catch (err) {
+    wrongMobileOtpRejected = true;
+    assert(err.message.includes('Mobile OTP'), 'Rejects invalid Mobile OTP with error');
+  }
+  assert(wrongMobileOtpRejected, 'Invalid Mobile OTP caught');
+
+  // 4. Reject wrong Email OTP
+  let wrongEmailOtpRejected = false;
+  try {
+    OtpService.verifyRegistrationOtp({
+      sessionId: otpDispatch.sessionId,
+      phoneOtp: otpDispatch.phoneOtp,
+      emailOtp: '000000'
+    });
+  } catch (err) {
+    wrongEmailOtpRejected = true;
+    assert(err.message.includes('Email verification code'), 'Rejects invalid Email code with error');
+  }
+  assert(wrongEmailOtpRejected, 'Invalid Email OTP caught');
+
+  // 5. Successful dual OTP verification
+  const otpVerification = OtpService.verifyRegistrationOtp({
+    sessionId: otpDispatch.sessionId,
+    phoneOtp: otpDispatch.phoneOtp,
+    emailOtp: otpDispatch.emailOtp
+  });
+  assert(otpVerification.success === true && otpVerification.verified === true, 'Dual OTP verification succeeds when both match');
+
+  // 6. User registered with verified credentials
+  const verifiedUser = UserService.createUser({
+    displayName: 'Pooja Kulkarni',
+    phone: otpDispatch.phone,
+    email: otpDispatch.email,
+    city: 'Thane',
+    isPhoneVerified: true,
+    isEmailVerified: true,
+    otpSessionId: otpDispatch.sessionId
+  });
+  assert(verifiedUser.isPhoneVerified === true, 'User record flagged with isPhoneVerified=true');
+  assert(verifiedUser.isEmailVerified === true, 'User record flagged with isEmailVerified=true');
+  assert(verifiedUser.otpSessionId === otpDispatch.sessionId, 'User record linked to verified OTP session ID');
+
+  // 7. Passwordless Login OTP Dispatch & Verification
+  const loginOtp = await OtpService.sendLoginOtp(verifiedUser.phone);
+  assert(loginOtp.success === true && loginOtp.otp.length === 6, 'Passwordless Login OTP dispatched to user phone');
+  const loginVerify = OtpService.verifyLoginOtp({
+    sessionId: loginOtp.sessionId,
+    otp: loginOtp.otp
+  });
+  assert(loginVerify.success === true && loginVerify.user.uid === verifiedUser.uid, 'Passwordless Login OTP verified and session activated');
 
   // Summary
   console.log('\n======================================================');

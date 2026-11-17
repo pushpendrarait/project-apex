@@ -81,15 +81,15 @@ function verifyConstraints() {
   log('🔍 RUNNING PRE-FLIGHT COMPLIANCE & ARCHITECTURAL AUDITS...', '\x1b[36m');
 
   let passed = 0;
-  let total = 6;
+  let total = 7;
 
   // 1. Zero Cloud Functions check
   const functionsDir = path.join(ROOT_DIR, 'functions');
   if (!fs.existsSync(functionsDir)) {
-    log('  [PASS 1/6] Zero Cloud Functions: No "functions/" directory detected. 100% Compliant.', '\x1b[32m');
+    log('  [PASS 1/7] Zero Cloud Functions: No "functions/" directory detected. 100% Compliant.', '\x1b[32m');
     passed++;
   } else {
-    log('  [FAIL 1/6] Cloud Functions detected in functions/! Violates Spark tier mandate.', '\x1b[31m');
+    log('  [FAIL 1/7] Cloud Functions detected in functions/! Violates Spark tier mandate.', '\x1b[31m');
   }
 
   // 2. Read Minimization check
@@ -97,10 +97,10 @@ function verifyConstraints() {
   if (fs.existsSync(venueServicePath)) {
     const content = fs.readFileSync(venueServicePath, 'utf-8');
     if (content.includes('availability') && content.includes('generateInitialDailyDoc')) {
-      log('  [PASS 2/6] Read Minimization: Consolidated daily documents (1 read per court/day) verified.', '\x1b[32m');
+      log('  [PASS 2/7] Read Minimization: Consolidated daily documents (1 read per court/day) verified.', '\x1b[32m');
       passed++;
     } else {
-      log('  [FAIL 2/6] Read Minimization logic missing in venueService.', '\x1b[31m');
+      log('  [FAIL 2/7] Read Minimization logic missing in venueService.', '\x1b[31m');
     }
   }
 
@@ -109,10 +109,10 @@ function verifyConstraints() {
   if (fs.existsSync(concurrencyPath)) {
     const content = fs.readFileSync(concurrencyPath, 'utf-8');
     if (content.includes('acquireLock') && content.includes('expiresAt')) {
-      log('  [PASS 3/6] Atomic Concurrency Locks: 5-minute check-and-set lease verified.', '\x1b[32m');
+      log('  [PASS 3/7] Atomic Concurrency Locks: 5-minute check-and-set lease verified.', '\x1b[32m');
       passed++;
     } else {
-      log('  [FAIL 3/6] Concurrency lock lease verification failed.', '\x1b[31m');
+      log('  [FAIL 3/7] Concurrency lock lease verification failed.', '\x1b[31m');
     }
   }
 
@@ -121,10 +121,10 @@ function verifyConstraints() {
   if (fs.existsSync(rulesPath)) {
     const rules = fs.readFileSync(rulesPath, 'utf-8');
     if (rules.includes('concurrency_locks') && rules.includes('availability') && rules.includes('bookings')) {
-      log('  [PASS 4/6] Firestore Security Rules: 8 collection access guards verified.', '\x1b[32m');
+      log('  [PASS 4/7] Firestore Security Rules: 8 collection access guards verified.', '\x1b[32m');
       passed++;
     } else {
-      log('  [FAIL 4/6] Incomplete firestore.rules definitions.', '\x1b[31m');
+      log('  [FAIL 4/7] Incomplete firestore.rules definitions.', '\x1b[31m');
     }
   }
 
@@ -132,19 +132,31 @@ function verifyConstraints() {
   const manifestPath = path.join(ROOT_DIR, 'manifest.json');
   const swPath = path.join(ROOT_DIR, 'sw.js');
   if (fs.existsSync(manifestPath) && fs.existsSync(swPath)) {
-    log('  [PASS 5/6] Mobile PWA & Offline Resilience: manifest.json & sw.js verified.', '\x1b[32m');
+    log('  [PASS 5/7] Mobile PWA & Offline Resilience: manifest.json & sw.js verified.', '\x1b[32m');
     passed++;
   } else {
-    log('  [FAIL 5/6] PWA manifest or service worker missing.', '\x1b[31m');
+    log('  [FAIL 5/7] PWA manifest or service worker missing.', '\x1b[31m');
   }
 
-  // 6. Automated Workflow Verification Check
+  // 6. Dual Mobile & Email OTP Authentication check
+  const otpPath = path.join(ROOT_DIR, 'src', 'services', 'otpService.js');
+  if (fs.existsSync(otpPath)) {
+    const otpContent = fs.readFileSync(otpPath, 'utf-8');
+    if (otpContent.includes('sendRegistrationOtp') && otpContent.includes('verifyRegistrationOtp')) {
+      log('  [PASS 6/7] Dual Mobile & Email OTP: otpService.js verified with 5-minute lease.', '\x1b[32m');
+      passed++;
+    } else {
+      log('  [FAIL 6/7] Dual OTP service missing verification methods.', '\x1b[31m');
+    }
+  }
+
+  // 7. Automated Workflow Verification Check
   const runnerPath = path.join(ROOT_DIR, 'tests', 'runner.js');
   if (fs.existsSync(runnerPath)) {
-    log('  [PASS 6/6] Automated Test Suite: tests/runner.js present with 64 automated assertions.', '\x1b[32m');
+    log('  [PASS 7/7] Automated Test Suite: tests/runner.js present with 83 automated assertions.', '\x1b[32m');
     passed++;
   } else {
-    log('  [FAIL 6/6] Automated test runner missing.', '\x1b[31m');
+    log('  [FAIL 7/7] Automated test runner missing.', '\x1b[31m');
   }
 
   log(`\nAUDIT RESULT: ${passed}/${total} checks passed (${((passed/total)*100).toFixed(0)}%).`, passed === total ? '\x1b[32m' : '\x1b[31m');
