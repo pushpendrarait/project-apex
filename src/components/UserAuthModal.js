@@ -66,7 +66,12 @@ export class UserAuthModal {
 
           <!-- 1-Click Fast Profile Switcher -->
           <div class="pt-3 border-t border-slate-800 space-y-2">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Or 1-Click Fast Login / Switch Profile:</span>
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Switch Profiles:</span>
+              <button type="button" id="btn-signout-guest" class="text-[10px] text-slate-400 hover:text-rose-400 transition underline">
+                Sign Out (Guest Mode)
+              </button>
+            </div>
             <div class="space-y-1.5 max-h-44 overflow-y-auto pr-1">
               ${allUsers.map(u => {
                 const isActive = currentUser && u.uid === currentUser.uid;
@@ -289,6 +294,19 @@ export class UserAuthModal {
         }
       });
     });
+
+    const btnSignout = modal.querySelector('#btn-signout-guest');
+    if (btnSignout) {
+      btnSignout.addEventListener('click', () => {
+        UserService.setCurrentUser('guest');
+        feedback.className = 'text-xs p-3 rounded-xl bg-slate-800 text-slate-300 block';
+        feedback.textContent = 'Signed out. Operating in Guest mode.';
+        setTimeout(() => {
+          close();
+          if (onUserChanged) onUserChanged(null);
+        }, 500);
+      });
+    }
 
     // Handle Sign In Form
     modal.querySelector('#form-signin').addEventListener('submit', (e) => {

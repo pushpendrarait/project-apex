@@ -226,6 +226,130 @@ async function runTests() {
   assert(mockDb.data.venues[ownerReg.venue.venueId].name === 'Shinde Pro Cricket Turf', 'Facility provisioned and persisted in database');
   assert(UserService.getCurrentUser().uid === ownerReg.user.uid, 'Active session switched to new facility owner');
 
+  // TEST SUITE 6: Facility Owner Gate Check-In & Walk-In Reservation
+  console.log('\n--- SUITE 6: Facility Owner Gate Check-In & Walk-In Reservation ---');
+  // 1. Walk-In Booking
+  const walkInDate = '2026-11-26';
+  const walkInSlot = '16:00';
+  const walkInCourt = 'court_thane_01_crk';
+
+  const walkInRes = await BookingService.createWalkInBooking({
+    venueId: 'venue_thane_01',
+    venueName: 'Apex Arena Ghodbunder',
+    courtId: walkInCourt,
+    courtName: 'Main Arena 8v8 Box Cricket',
+    sport: 'cricket',
+    date: walkInDate,
+    slot: walkInSlot,
+    customerName: 'Aditya Kadam',
+    customerPhone: '+91 98111 22334',
+    amountCollected: 1200,
+    ownerId: ownerReg.user.uid
+  });
+  assert(walkInRes.success === true, 'Walk-in booking created by venue owner successfully');
+  assert(walkInRes.booking.source === 'walk_in', 'Booking tagged with source walk_in');
+  assert(walkInRes.booking.payment.method === 'CASH', 'Payment recorded as cash collected at venue');
+  assert(mockDb.data.availability[`${walkInCourt}_${walkInDate}`].slots[walkInSlot].status === 'BOOKED', 'Slot marked BOOKED in daily availability document');
+
+  // Prevent double booking walk-in slot
+  let walkInConflict = false;
+  try {
+    await BookingService.createWalkInBooking({
+      venueId: 'venue_thane_01',
+      courtId: walkInCourt,
+      date: walkInDate,
+      slot: walkInSlot,
+      customerName: 'Another Player'
+    });
+  } catch (err) {
+    walkInConflict = true;
+    assert(err.message.includes('already booked'), 'Duplicate walk-in booking rejected');
+  }
+  assert(walkInConflict === true, 'Walk-in double booking prevented');
+
+  // 2. Gate QR Pass Check-In Verification
+  const gateCheckIn = BookingService.checkInPlayer(walkInRes.booking.qrPassToken, ownerReg.user.uid);
+  assert(gateCheckIn.success === true, 'Gate QR Pass check-in verified and accepted');
+  assert(gateCheckIn.alreadyCheckedIn === false, 'First-time check-in recorded');
+  assert(mockDb.data.bookings[walkInRes.booking.bookingId].status === 'CHECKED_IN', 'Booking status transitioned to CHECKED_IN');
+  assert(typeof mockDb.data.bookings[walkInRes.booking.bookingId].checkedInAt === 'number', 'Check-in timestamp recorded');
+
+  // Duplicate Check-In detection
+  const duplicateCheckIn = BookingService.checkInPlayer(walkInRes.booking.qrPassToken, ownerReg.user.uid);
+  assert(duplicateCheckIn.alreadyCheckedIn === true, 'Duplicate check-in attempt detected and prevented');
+
+  // Unrecognized token rejection
+  let invalidTokenFailed = false;
+  try {
+    BookingService.checkInPlayer('APEX-INVALID-PASS-TOKEN');
+  } catch (err) {
+    invalidTokenFailed = true;
+    assert(err.message.includes('Unrecognized QR Pass Token'), 'Invalid QR token rejected at gate');
+  }
+  assert(invalidTokenFailed === true, 'Invalid gate pass rejected');
+
+  // Cancelled pass rejection at gate
+  let cancelledPassFailed = false;
+  try {
+    BookingService.checkInPlayer(commitResult.booking.qrPassToken);
+  } catch (err) {
+    cancelledPassFailed = true;
+    assert(err.message.includes('Pass cancelled'), 'Cancelled booking QR pass rejected at gate');
+  }
+  assert(cancelledPassFailed === true, 'Cancelled pass gate entry blocked');
+
+  // TEST SUITE 7: End-to-End 6 Workflows Acceptance Criteria Matrix
+  console.log('\n--- SUITE 7: End-to-End 6 Workflows Acceptance Verification ---');
+  // WF1: User (Player) Registration Flow
+  const wf1User = UserService.createUser({ displayName: 'Karan Mehra', phone: '+91 97777 88888', email: 'karan@apex.test', role: 'player', city: 'Mumbai' });
+  assert(wf1User.uid && wf1User.loyaltyPoints === 100, 'WF1 [Player Registration]: Account provisioned with 100 welcome loyalty points');
+
+  // WF2: Facility Owner Registration & Facility Auto-Provisioning Flow
+  const wf2Owner = UserService.registerFacilityOwner({ displayName: 'Naresh Mehta', phone: '+91 96666 55555', email: 'naresh@mehtasports.com', city: 'Mumbai', facilityName: 'Mehta Sports Turf Bandra', area: 'Bandra West', sports: ['football', 'cricket'], startingPrice: 1500 });
+  assert(wf2Owner.user.role === 'venue_owner' && wf2Owner.venue.venueId, 'WF2 [Owner Registration & Auto-Provisioning]: Owner & facility linked');
+
+  // WF3: Adding / Onboarding New Facilities
+  const wf3Venue = VenueService.createVenue({ name: 'Navi Mumbai Smashers Badminton', city: 'Navi Mumbai', area: 'Vashi', address: 'Sector 17, Vashi', sports: ['badminton'], amenities: ['Air-Conditioning', 'Synthetic Wooden Courts'], startingPrice: 600, ownerId: wf2Owner.user.uid });
+  assert(wf3Venue.venueId && VenueService.getCourtsForVenue(wf3Venue.venueId).length >= 1, 'WF3 [Facility Onboarding]: Facility & court schedule provisioned');
+
+  // WF4: Slot Reservation, Concurrency Lock & Atomic Booking Commit
+  const wf4Court = VenueService.getCourtsForVenue(wf3Venue.venueId)[0];
+  const wf4Lock = await ConcurrencyService.acquireLock({ courtId: wf4Court.courtId, date: '2026-11-29', slot: '19:00', userId: wf1User.uid });
+  assert(wf4Lock.success === true, 'WF4a [Concurrency Lock]: 5-min TTL lock acquired');
+  const wf4Commit = await BookingService.commitBooking({
+    userId: wf1User.uid,
+    userName: wf1User.displayName,
+    userPhone: wf1User.phone,
+    venueId: wf3Venue.venueId,
+    venueName: wf3Venue.name,
+    courtId: wf4Court.courtId,
+    courtName: wf4Court.name,
+    sport: 'badminton',
+    date: '2026-11-29',
+    slot: '19:00',
+    pricing: { baseRate: 600, total: 620, isOddHour: false },
+    paymentMethod: 'UPI'
+  });
+  assert(wf4Commit.booking.status === 'CONFIRMED' && wf4Commit.booking.qrPassToken, 'WF4b [Atomic Commit]: Multi-doc commit & QR pass generated');
+
+  // WF5: Facility Owner Gate Check-In & Walk-In Reservation
+  const wf5CheckIn = BookingService.checkInPlayer(wf4Commit.booking.qrPassToken, wf2Owner.user.uid);
+  assert(wf5CheckIn.success === true && wf5CheckIn.booking.status === 'CHECKED_IN', 'WF5a [Gate Check-In]: QR token verified and checked in');
+  const wf5WalkIn = await BookingService.createWalkInBooking({
+    venueId: wf3Venue.venueId,
+    courtId: wf4Court.courtId,
+    date: '2026-11-29',
+    slot: '20:00',
+    customerName: 'Sameer Joshi',
+    amountCollected: 600,
+    ownerId: wf2Owner.user.uid
+  });
+  assert(wf5WalkIn.success === true && wf5WalkIn.booking.source === 'walk_in', 'WF5b [Walk-In Reservation]: Offline booking committed atomically');
+
+  // WF6: 3-Tier Cancellation & Refunds
+  const wf6RefundPreview = CancellationService.previewRefund(wf4Commit.booking);
+  assert(wf6RefundPreview.tier >= 1 && typeof wf6RefundPreview.refundAmount === 'number', 'WF6 [3-Tier Cancellation]: Refund tier calculated dynamically');
+
   // Summary
   console.log('\n======================================================');
   console.log(`🏁 TEST RESULTS: ${passedTests}/${totalTests} PASSED (100%)`);

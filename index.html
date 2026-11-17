@@ -94,6 +94,10 @@
 
       <!-- Actions, List Venue & User Switcher -->
       <div class="flex items-center gap-2">
+        <button id="btn-header-scenarios" class="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md transition" title="Launch Interactive Workflow Demonstrator">
+          <span>⚡ Workflows</span>
+        </button>
+
         <button id="btn-header-auth" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black shadow-md transition">
           <span>🔑 Login / Register</span>
         </button>
@@ -172,6 +176,8 @@
     import { UserService } from './src/services/userService.js';
     import { AddVenueModal } from './src/components/AddVenueModal.js';
     import { UserAuthModal } from './src/components/UserAuthModal.js';
+    import { ScenarioRunnerModal } from './src/components/ScenarioRunnerModal.js';
+    import { ScenarioRunnerModal } from './src/components/ScenarioRunnerModal.js';
 
     class ApexApp {
       constructor() {
@@ -248,6 +254,30 @@
         document.getElementById('tab-bookings').addEventListener('click', () => setTabActive('bookings'));
         document.getElementById('tab-partner').addEventListener('click', () => setTabActive('partner'));
         document.getElementById('tab-admin').addEventListener('click', () => setTabActive('admin'));
+
+        const btnScenarios = document.getElementById('btn-header-scenarios');
+        if (btnScenarios) {
+          btnScenarios.addEventListener('click', () => {
+            ScenarioRunnerModal.show({
+              onStateUpdated: () => {
+                this.updateHeaderUser();
+                this.renderView(this.currentView);
+              }
+            });
+          });
+        }
+
+        const btnScenarios = document.getElementById('btn-header-scenarios');
+        if (btnScenarios) {
+          btnScenarios.addEventListener('click', () => {
+            ScenarioRunnerModal.show({
+              onStateUpdated: () => {
+                this.updateHeaderUser();
+                this.renderView(this.currentView);
+              }
+            });
+          });
+        }
 
         const btnAuth = document.getElementById('btn-header-auth');
         if (btnAuth) {

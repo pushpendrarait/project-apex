@@ -1,6 +1,6 @@
 {
   "mission": "001-project-apex-mvp",
-  "lastUpdated": "2026-11-17T17:59:00Z",
+  "lastUpdated": "2026-11-17T22:30:00Z",
   "lanes": {
     "done": [
       {
@@ -56,6 +56,54 @@
         "title": "Firebase Spark Deployment & Quota Monitors",
         "agent": "apex-deployment",
         "completedAt": "2026-11-17T17:58:35Z"
+      },
+      {
+        "id": "WF01",
+        "title": "User (Player) Registration & Welcome Loyalty Onboarding",
+        "agent": "apex-ba",
+        "component": "UserAuthModal.js",
+        "testSuite": "tests/runner.js (Suite 5 & 7)",
+        "completedAt": "2026-11-17T22:23:00Z"
+      },
+      {
+        "id": "WF02",
+        "title": "Facility Owner Registration & Facility Auto-Provisioning",
+        "agent": "apex-ba",
+        "component": "UserAuthModal.js (Partner)",
+        "testSuite": "tests/runner.js (Suite 5 & 7)",
+        "completedAt": "2026-11-17T22:23:00Z"
+      },
+      {
+        "id": "WF03",
+        "title": "Adding / Onboarding New Facilities & Pitch Schedules",
+        "agent": "apex-frontend",
+        "component": "AddVenueModal.js",
+        "testSuite": "tests/runner.js (Suite 5 & 7)",
+        "completedAt": "2026-11-17T19:25:00Z"
+      },
+      {
+        "id": "WF04",
+        "title": "Slot Reservation, Concurrency Lock & Atomic Booking Commit",
+        "agent": "apex-backend",
+        "component": "SlotCalendar.js & CheckoutModal.js",
+        "testSuite": "tests/runner.js (Suite 1, 4, 7)",
+        "completedAt": "2026-11-17T20:51:00Z"
+      },
+      {
+        "id": "WF05",
+        "title": "Facility Owner Gate QR Check-In & Walk-In Reservation",
+        "agent": "apex-backend",
+        "component": "VenueOwnerPortal.js",
+        "testSuite": "tests/runner.js (Suite 6 & 7)",
+        "completedAt": "2026-11-17T22:30:00Z"
+      },
+      {
+        "id": "WF06",
+        "title": "3-Tier Fair Cancellation & Automated Refunds",
+        "agent": "apex-legal",
+        "component": "PlayerPortal.js",
+        "testSuite": "tests/runner.js (Suite 4 & 7)",
+        "completedAt": "2026-11-17T20:51:00Z"
       }
     ],
     "review": [],

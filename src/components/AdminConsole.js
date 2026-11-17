@@ -3,6 +3,7 @@
  */
 
 import { mockDb } from '../services/firebaseConfig.js';
+import { ScenarioRunnerModal } from './ScenarioRunnerModal.js';
 
 export class AdminConsole {
   constructor({ onBack }) {
@@ -38,9 +39,14 @@ export class AdminConsole {
             <p class="text-xs text-slate-400">Firebase Spark Free Tier Audit & Multi-Agent Matrix</p>
           </div>
 
-          <button id="btn-back-admin" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition">
-            ← Switch to Player View
-          </button>
+          <div class="flex items-center gap-2">
+            <button id="btn-admin-run-scenarios" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition flex items-center gap-1.5">
+              <span>⚡ Run Live Workflow Scenarios</span>
+            </button>
+            <button id="btn-back-admin" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition">
+              ← Switch to Player View
+            </button>
+          </div>
         </div>
 
         <!-- Spark Quota Budgets -->
@@ -206,5 +212,16 @@ export class AdminConsole {
     container.querySelector('#btn-back-admin').addEventListener('click', () => {
       if (this.onBack) this.onBack();
     });
+
+    const btnScenarios = container.querySelector('#btn-admin-run-scenarios');
+    if (btnScenarios) {
+      btnScenarios.addEventListener('click', () => {
+        ScenarioRunnerModal.show({
+          onStateUpdated: () => {
+            this.render(container);
+          }
+        });
+      });
+    }
   }
 }
