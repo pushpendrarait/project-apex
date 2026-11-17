@@ -1,0 +1,13 @@
+project:
+  uuid: 64065afb-7658-473e-bf2d-1ccf1b07d2cd
+  slug: project-apex
+  node_id: 08ab21d5fd10
+  build_id: 598b7fd7-2575-53dc-a943-58980921ad0e
+vcs:
+  type: git
+agents:
+  available:
+  - antigravity
+  - gemini
+  auto_commit: true
+  lint_on_edit: false

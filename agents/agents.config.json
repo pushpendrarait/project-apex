@@ -1,0 +1,151 @@
+{
+  "system": "Project Apex Multi-Agent Framework",
+  "version": "1.0.0",
+  "governance": "Spec Kitty Spec-Driven Development",
+  "constraints": {
+    "zeroCloudFunctions": true,
+    "sparkTierStrict": true,
+    "maxDailyReads": 50000,
+    "maxDailyWrites": 20000,
+    "targetJurisdiction": "India / Maharashtra (Mumbai, Thane, Navi Mumbai)"
+  },
+  "agents": {
+    "apex-pm": {
+      "name": "Project Manager & Spec Kitty Controller",
+      "slug": "apex-pm",
+      "role": "Orchestration & Governance",
+      "duties": [
+        "Enforce Spec Kitty SDD lifecycle (specify -> plan -> tasks -> implement)",
+        "Maintain kanban work package lanes (backlog, doing, review, done)",
+        "Audit compliance against Zero Cloud Functions and Spark Tier constraints",
+        "Generate multi-agent velocity and status reports"
+      ],
+      "artifacts": ["spec.md", "plan.md", "tasks.md", "kanban.json"]
+    },
+    "apex-ba": {
+      "name": "Business Analyst",
+      "slug": "apex-ba",
+      "role": "Domain Requirements & Analysis",
+      "duties": [
+        "Document player and venue owner user stories and PRDs",
+        "Formulate dynamic off-peak and odd-hour discount schedules",
+        "Define 3-tier cancellation and refund policy matrices",
+        "Define Given-When-Then acceptance criteria"
+      ],
+      "artifacts": ["docs/prd.md", "spec.md"]
+    },
+    "apex-database": {
+      "name": "Database Expert",
+      "slug": "apex-database",
+      "role": "Data Architecture & Security Rules",
+      "duties": [
+        "Maintain 8-collection Firestore schema optimized for Spark Free Tier",
+        "Enforce 1-read-per-court-per-day consolidated daily availability docs",
+        "Write and validate fail-safe firestore.rules",
+        "Configure composite query indexes in firestore.indexes.json"
+      ],
+      "artifacts": ["firestore.rules", "firestore.indexes.json", "data-model.md"]
+    },
+    "apex-backend": {
+      "name": "Backend Engineer",
+      "slug": "apex-backend",
+      "role": "Atomic Transactions & Core Services",
+      "duties": [
+        "Implement client-side check-and-set concurrency locks with 5-minute TTL",
+        "Implement multi-document atomic commit transactions via runTransaction",
+        "Build dynamic pricing and promo discount engine",
+        "Build payment gateway integration and QR pass generator"
+      ],
+      "artifacts": [
+        "src/services/concurrencyService.js",
+        "src/services/bookingService.js",
+        "src/services/pricingEngine.js",
+        "src/services/paymentService.js",
+        "src/services/cancellationService.js"
+      ]
+    },
+    "apex-frontend": {
+      "name": "Frontend / UI Expert",
+      "slug": "apex-frontend",
+      "role": "UI/UX & Interactive Components",
+      "duties": [
+        "Build responsive Venue Explorer with Thane/Mumbai city filtering",
+        "Create real-time interactive Slot Grid with odd-hour discount badges",
+        "Build frictionless checkout modal with 5-minute reservation timer",
+        "Build Player Portal ('My Bookings') and Venue Owner Management Portal"
+      ],
+      "artifacts": [
+        "index.html",
+        "src/components/VenueExplorer.js",
+        "src/components/SlotCalendar.js",
+        "src/components/CheckoutModal.js",
+        "src/components/BookingConfirmation.js",
+        "src/components/PlayerPortal.js",
+        "src/components/VenueOwnerPortal.js",
+        "src/components/AdminConsole.js"
+      ]
+    },
+    "apex-mobile": {
+      "name": "Mobile App Expert",
+      "slug": "apex-mobile",
+      "role": "PWA & Offline Resilience",
+      "duties": [
+        "Configure PWA manifest.json with mobile install banners",
+        "Implement service worker sw.js for offline asset caching",
+        "Implement IndexedDB storage for venue catalogs and QR passes",
+        "Optimize touch targets and mobile viewport rendering"
+      ],
+      "artifacts": ["public/manifest.json", "public/sw.js", "src/services/offlineStorage.js"]
+    },
+    "apex-marketing": {
+      "name": "Marketing Expert",
+      "slug": "apex-marketing",
+      "role": "Growth & Monetization",
+      "duties": [
+        "Design Thane and Mumbai urban expansion and tournament playbooks",
+        "Create odd-hour and off-peak promotional discount campaigns",
+        "Design player referral loops and loyalty tiers",
+        "Draft automated SMS/Push notification re-engagement templates"
+      ],
+      "artifacts": [
+        "docs/marketing/thane-mumbai-growth-strategy.md",
+        "docs/marketing/off-peak-demand-playbook.md",
+        "docs/marketing/loyalty-and-referral-program.md"
+      ]
+    },
+    "apex-legal": {
+      "name": "Legal Compliance Expert",
+      "slug": "apex-legal",
+      "role": "Legal & Risk Mitigation",
+      "duties": [
+        "Draft Terms of Service under IT Act 2000 Section 79",
+        "Draft DPDP Act 2023 compliant User Privacy Policy",
+        "Draft physical sporting injury & property damage liability waivers",
+        "Draft Venue Partner Agreement for facility owners in Maharashtra"
+      ],
+      "artifacts": [
+        "docs/legal/terms-of-service.md",
+        "docs/legal/privacy-policy.md",
+        "docs/legal/injury-liability-waiver.md",
+        "docs/legal/vendor-partner-agreement.md"
+      ]
+    },
+    "apex-deployment": {
+      "name": "Deployment Engineer",
+      "slug": "apex-deployment",
+      "role": "CI/CD & Quota Monitoring",
+      "duties": [
+        "Configure Firebase Hosting, Firestore Rules, and Indexes",
+        "Establish 50,000 daily read threshold monitoring calculations",
+        "Implement pre-flight Zero Cloud Functions audit CLI",
+        "Execute automated deployment to Firebase Spark tier"
+      ],
+      "artifacts": [
+        "firebase.json",
+        ".firebaserc",
+        "docs/deployment/spark-tier-quota-budget.md",
+        "docs/deployment/deployment-guide.md"
+      ]
+    }
+  }
+}

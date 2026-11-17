@@ -1,0 +1,32 @@
+{
+  "name": "project-apex",
+  "version": "1.0.0",
+  "description": "Unified sports facility booking platform for Thane, Mumbai & Navi Mumbai on Firebase Spark Free Tier",
+  "type": "module",
+  "scripts": {
+    "start": "npx serve . -l 3000",
+    "dev": "npx serve . -l 3000",
+    "test": "node orchestrator/orchestrator.js verify",
+    "orchestrator": "node orchestrator/orchestrator.js status",
+    "orchestrator:status": "node orchestrator/orchestrator.js status",
+    "orchestrator:verify": "node orchestrator/orchestrator.js verify",
+    "orchestrator:pipeline": "node orchestrator/orchestrator.js pipeline",
+    "orchestrator:deploy": "node orchestrator/orchestrator.js deploy",
+    "deploy": "firebase deploy --only hosting,firestore:rules,firestore:indexes"
+  },
+  "keywords": [
+    "sports-facility-booking",
+    "box-cricket",
+    "football-turf",
+    "badminton",
+    "pickleball",
+    "thane",
+    "mumbai",
+    "firebase-spark-tier",
+    "zero-cloud-functions",
+    "spec-kitty",
+    "multi-agent"
+  ],
+  "author": "Pushpendra Rait",
+  "license": "Apache-2.0"
+}

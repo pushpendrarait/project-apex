@@ -1,0 +1,65 @@
+{
+  "mission": "001-project-apex-mvp",
+  "lastUpdated": "2026-11-17T17:59:00Z",
+  "lanes": {
+    "done": [
+      {
+        "id": "WP01",
+        "title": "Project Governance & Spec Kitty Setup",
+        "agent": "apex-pm",
+        "completedAt": "2026-11-17T17:48:00Z"
+      },
+      {
+        "id": "WP02",
+        "title": "Business Analysis, PRD & Acceptance Criteria",
+        "agent": "apex-ba",
+        "completedAt": "2026-11-17T17:49:00Z"
+      },
+      {
+        "id": "WP03",
+        "title": "Firestore 8-Collection Schema & Security Rules",
+        "agent": "apex-database",
+        "completedAt": "2026-11-17T17:50:30Z"
+      },
+      {
+        "id": "WP04",
+        "title": "Atomic Concurrency Locks & Booking Transactions",
+        "agent": "apex-backend",
+        "completedAt": "2026-11-17T17:52:45Z"
+      },
+      {
+        "id": "WP05",
+        "title": "Mobile-First UI, Slot Grid & Checkout Modal",
+        "agent": "apex-frontend",
+        "completedAt": "2026-11-17T17:54:10Z"
+      },
+      {
+        "id": "WP06",
+        "title": "PWA Manifest, Service Worker & Offline Cache",
+        "agent": "apex-mobile",
+        "completedAt": "2026-11-17T17:56:30Z"
+      },
+      {
+        "id": "WP07",
+        "title": "Urban Growth Campaigns, Odd-Hour Discounts & Loyalty",
+        "agent": "apex-marketing",
+        "completedAt": "2026-11-17T17:58:10Z"
+      },
+      {
+        "id": "WP08",
+        "title": "Indian Jurisdiction ToS, Liability Waivers & Agreements",
+        "agent": "apex-legal",
+        "completedAt": "2026-11-17T17:57:45Z"
+      },
+      {
+        "id": "WP09",
+        "title": "Firebase Spark Deployment & Quota Monitors",
+        "agent": "apex-deployment",
+        "completedAt": "2026-11-17T17:58:35Z"
+      }
+    ],
+    "review": [],
+    "doing": [],
+    "backlog": []
+  }
+}
