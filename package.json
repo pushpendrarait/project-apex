@@ -6,7 +6,7 @@
   "scripts": {
     "start": "npx serve . -l 3000",
     "dev": "npx serve . -l 3000",
-    "test": "node orchestrator/orchestrator.js verify",
+    "test": "node orchestrator/orchestrator.js verify && node tests/runner.js",
     "orchestrator": "node orchestrator/orchestrator.js status",
     "orchestrator:status": "node orchestrator/orchestrator.js status",
     "orchestrator:verify": "node orchestrator/orchestrator.js verify",

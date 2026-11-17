@@ -22,8 +22,10 @@ class MockFirestoreRuntime {
 
   loadInitialData() {
     try {
-      const saved = localStorage.getItem(this.storageKey);
-      if (saved) return JSON.parse(saved);
+      if (typeof localStorage !== 'undefined') {
+        const saved = localStorage.getItem(this.storageKey);
+        if (saved) return JSON.parse(saved);
+      }
     } catch (e) {
       console.warn("Storage error, fallback to seed data", e);
     }
@@ -32,7 +34,9 @@ class MockFirestoreRuntime {
 
   persist() {
     try {
-      localStorage.setItem(this.storageKey, JSON.stringify(this.data));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(this.storageKey, JSON.stringify(this.data));
+      }
     } catch (e) {
       console.error("Failed to persist to localStorage", e);
     }
@@ -126,6 +130,40 @@ class MockFirestoreRuntime {
           images: [
             "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=1200&q=80"
           ]
+        },
+        "venue_thane_03": {
+          venueId: "venue_thane_03",
+          name: "Meadows Champions Turf",
+          city: "Thane",
+          area: "Hiranandani Meadows",
+          address: "Off Pokhran Road 2, Hiranandani Meadows, Thane West 400610",
+          coordinates: { lat: 19.2231, lng: 72.9691 },
+          sports: ["cricket", "football", "tennis"],
+          amenities: ["Panoramic Hill View", "Pro Turf Pitch", "Floodlights", "Spectator Stands", "Changing Rooms"],
+          rating: 4.9,
+          reviewsCount: 245,
+          startingPrice: 1100,
+          featured: true,
+          images: [
+            "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80"
+          ]
+        },
+        "venue_mumbai_03": {
+          venueId: "venue_mumbai_03",
+          name: "BKC Racket & Squash Arena",
+          city: "Mumbai",
+          area: "Bandra Kurla Complex (BKC)",
+          address: "G Block, Near MCA Club, BKC, Bandra East, Mumbai 400051",
+          coordinates: { lat: 19.0662, lng: 72.8687 },
+          sports: ["badminton", "squash", "pickleball", "tennis"],
+          amenities: ["Air-conditioned Glass Squash Courts", "Imported Maple Badminton", "Physiotherapy Desk", "Executive Showers"],
+          rating: 4.9,
+          reviewsCount: 410,
+          startingPrice: 800,
+          featured: true,
+          images: [
+            "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=1200&q=80"
+          ]
         }
       },
       courts: {
@@ -161,6 +199,39 @@ class MockFirestoreRuntime {
           baseHourlyRate: 750,
           peakHourlyRate: 950,
           oddHourDiscountPct: 25
+        },
+        "court_thane_03_crk": {
+          courtId: "court_thane_03_crk",
+          venueId: "venue_thane_03",
+          name: "Meadows Stadium Turf Cricket",
+          sport: "cricket",
+          surface: "Super-soft High-density Green Turf",
+          dimensions: "110ft x 60ft",
+          baseHourlyRate: 1100,
+          peakHourlyRate: 1500,
+          oddHourDiscountPct: 35
+        },
+        "court_bkc_01_sq": {
+          courtId: "court_bkc_01_sq",
+          venueId: "venue_mumbai_03",
+          name: "BKC Glass-Back Aircon Squash Court 1",
+          sport: "squash",
+          surface: "ASB Approved Glass & Beechwood",
+          dimensions: "32ft x 21ft",
+          baseHourlyRate: 800,
+          peakHourlyRate: 1100,
+          oddHourDiscountPct: 30
+        },
+        "court_bkc_02_bm": {
+          courtId: "court_bkc_02_bm",
+          venueId: "venue_mumbai_03",
+          name: "BKC Championship Badminton Court 1",
+          sport: "badminton",
+          surface: "Olympic Certified 9mm Mat",
+          dimensions: "44ft x 20ft",
+          baseHourlyRate: 700,
+          peakHourlyRate: 950,
+          oddHourDiscountPct: 30
         },
         "court_mumbai_01_fb": {
           courtId: "court_mumbai_01_fb",
