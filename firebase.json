@@ -9,7 +9,9 @@
       ".kittify/**",
       "orchestrator/**",
       "docs/**",
-      "scripts/**"
+      "scripts/**",
+      "backend/**",
+      "tests/**"
     ],
     "rewrites": [
       {
