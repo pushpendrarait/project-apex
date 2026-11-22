@@ -1,0 +1,65 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "venues",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "city", "order": "ASCENDING" },
+        { "fieldPath": "minSlotPricePaise", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "venues",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "city", "order": "ASCENDING" },
+        { "fieldPath": "sportTypes", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "minSlotPricePaise", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "slotLocks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "resourceId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "bookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "bookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ownerId", "order": "ASCENDING" },
+        { "fieldPath": "bookingDate", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "bookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "holdExpiresAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "discounts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ownerId", "order": "ASCENDING" },
+        { "fieldPath": "isActive", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

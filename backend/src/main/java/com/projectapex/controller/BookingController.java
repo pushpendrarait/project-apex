@@ -1,19 +1,21 @@
 package com.projectapex.controller;
 
-import com.projectapex.dto.request.CommitBookingRequest;
+import com.projectapex.dto.request.*;
 import com.projectapex.dto.response.ApiResponse;
 import com.projectapex.model.BookingRecord;
+import com.projectapex.model.ConcurrencyLock;
 import com.projectapex.service.BookingService;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/bookings")
+@RequestMapping("/api/v1")
+@CrossOrigin(origins = "*")
 public class BookingController {
 
     private final BookingService bookingService;
@@ -23,64 +25,77 @@ public class BookingController {
     }
 
     /**
-     * Atomically commits a booking after verifying Razorpay HMAC SHA256 signature
+     * POST /api/v1/bookings/initiate - Atomically holds slots and creates Razorpay Order
      */
-    @PostMapping("/commit")
-    public ResponseEntity<ApiResponse<BookingRecord>> commitBooking(
-            @Valid @RequestBody CommitBookingRequest req,
-            Authentication auth,
-            @RequestHeader(value = "X-User-Id", required = false) String headerUserId) {
-        String userId = auth != null && auth.getName() != null && !"anonymousUser".equals(auth.getName())
-                ? auth.getName()
-                : (headerUserId != null ? headerUserId : "demo_player");
-
-        BookingRecord booking = bookingService.commitBooking(
-                userId,
-                req.getCourtId(),
-                req.getDate(),
-                req.getSlot(),
-                req.getRazorpayOrderId(),
-                req.getRazorpayPaymentId(),
-                req.getRazorpaySignature(),
-                req.getPaymentMethod()
-        );
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok("Booking confirmed and QR gate pass issued", booking));
+    @PostMapping("/bookings/initiate")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> initiateBooking(
+            @Valid @RequestBody InitiateBookingRequest req,
+            Authentication auth
+    ) {
+        String userId = auth != null ? auth.getName() : "demo_player";
+        Map<String, Object> res = bookingService.initiateBooking(req, userId);
+        return ResponseEntity.ok(ApiResponse.ok("Booking initiated. 10-minute slot hold acquired.", res));
     }
 
     /**
-     * Retrieves strictly the authenticated user's match bookings and digital QR passes
+     * POST /api/v1/bookings/{bookingId}/verify-payment - Verifies Razorpay signature & confirms booking
      */
-    @GetMapping("/my-passes")
-    public ResponseEntity<ApiResponse<List<BookingRecord>>> getMyPasses(
-            Authentication auth,
-            @RequestHeader(value = "X-User-Id", required = false) String headerUserId) {
-        String userId = auth != null && auth.getName() != null && !"anonymousUser".equals(auth.getName())
-                ? auth.getName()
-                : headerUserId;
+    @PostMapping("/bookings/{bookingId}/verify-payment")
+    public ResponseEntity<ApiResponse<BookingRecord>> verifyPayment(
+            @PathVariable String bookingId,
+            @Valid @RequestBody VerifyPaymentRequest req
+    ) {
+        BookingRecord confirmed = bookingService.verifyPayment(bookingId, req);
+        return ResponseEntity.ok(ApiResponse.ok("Payment verified and booking confirmed", confirmed));
+    }
 
-        if (userId == null || "guest".equalsIgnoreCase(userId)) {
-            return ResponseEntity.ok(ApiResponse.ok("Guest mode: No passes found", List.of()));
-        }
-
+    /**
+     * GET /api/v1/bookings/my - Player's bookings
+     */
+    @GetMapping("/bookings/my")
+    public ResponseEntity<ApiResponse<List<BookingRecord>>> getMyBookings(Authentication auth) {
+        String userId = auth != null ? auth.getName() : "demo_player";
         List<BookingRecord> bookings = bookingService.getPlayerBookings(userId);
-        return ResponseEntity.ok(ApiResponse.ok(bookings));
+        return ResponseEntity.ok(ApiResponse.ok("Player bookings retrieved", bookings));
     }
 
     /**
-     * 3-Tier Cancellation & Automated Refund
+     * GET /api/v1/bookings/{bookingId} - Booking details
      */
-    @PostMapping("/{id}/cancel")
-    public ResponseEntity<ApiResponse<BookingRecord>> cancelBooking(
-            @PathVariable String id,
-            Authentication auth,
-            @RequestHeader(value = "X-User-Id", required = false) String headerUserId) {
-        String userId = auth != null && auth.getName() != null && !"anonymousUser".equals(auth.getName())
-                ? auth.getName()
-                : (headerUserId != null ? headerUserId : "demo_player");
+    @GetMapping("/bookings/{bookingId}")
+    public ResponseEntity<ApiResponse<BookingRecord>> getBooking(@PathVariable String bookingId) {
+        BookingRecord b = bookingService.getBooking(bookingId);
+        return ResponseEntity.ok(ApiResponse.ok("Booking details", b));
+    }
 
-        BookingRecord cancelled = bookingService.cancelBooking(id, userId);
+    /**
+     * POST /api/v1/bookings/{bookingId}/cancel - Player cancellation with 3-tier policy
+     */
+    @PostMapping("/bookings/{bookingId}/cancel")
+    public ResponseEntity<ApiResponse<BookingRecord>> cancelBooking(
+            @PathVariable String bookingId,
+            @RequestBody(required = false) CancelBookingRequest req,
+            Authentication auth
+    ) {
+        String userId = auth != null ? auth.getName() : "demo_player";
+        String reason = req != null && req.getReason() != null ? req.getReason() : "Player requested cancellation";
+        BookingRecord cancelled = bookingService.cancelBookingByPlayer(bookingId, userId, reason);
         return ResponseEntity.ok(ApiResponse.ok("Booking cancelled and refund processed", cancelled));
+    }
+
+    // =========================================================================
+    // Compatibility Endpoints for Test Suite (Runner Tests)
+    // =========================================================================
+
+    @PostMapping("/bookings/commit")
+    public ResponseEntity<ApiResponse<BookingRecord>> commitBooking(@Valid @RequestBody CommitBookingRequest req) {
+        BookingRecord b = bookingService.commitBooking(req);
+        return ResponseEntity.ok(ApiResponse.ok("Booking committed", b));
+    }
+
+    @PostMapping("/bookings/walkin")
+    public ResponseEntity<ApiResponse<BookingRecord>> walkInBooking(@Valid @RequestBody WalkInBookingRequest req) {
+        BookingRecord b = bookingService.createWalkInBooking(req);
+        return ResponseEntity.ok(ApiResponse.ok("Walk-in booking recorded", b));
     }
 }

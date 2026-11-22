@@ -90,7 +90,7 @@ export class CheckoutModal {
           </div>
           <div class="flex justify-between text-slate-300">
             <span>Player:</span>
-            <span>${UserService.getCurrentUser().displayName} (${UserService.getCurrentUser().phone})</span>
+            <span>${UserService.getCurrentUser() ? UserService.getCurrentUser().displayName : 'Guest'} (${UserService.getCurrentUser() ? UserService.getCurrentUser().phone : 'Verified'})</span>
           </div>
         </div>
 

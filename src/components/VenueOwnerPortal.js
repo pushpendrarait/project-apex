@@ -160,6 +160,41 @@ export class VenueOwnerPortal {
           </div>
         </div>
 
+        <!-- Courts & Sports Facilities Inventory -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-base font-black text-white flex items-center gap-2">
+                <span>🏟️ Active Turf & Court Facilities (${courts.length})</span>
+              </h3>
+              <p class="text-xs text-slate-400 mt-0.5">Specifications, capacity, surface details and hourly rates for ${venue.name}</p>
+            </div>
+            <button id="btn-owner-add-court" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs shadow-md shadow-emerald-500/20 transition flex items-center gap-1.5 shrink-0">
+              <span>+ Add Court / Facility</span>
+            </button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            ${courts.map(c => `
+              <div class="bg-slate-950/80 border border-slate-800/80 rounded-xl p-4 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-white text-xs">${c.name}</span>
+                  <span class="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">${c.sport}</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-400">
+                  <div>Capacity: <strong class="text-slate-200">${c.capacity || 16} Players</strong></div>
+                  <div>Surface: <strong class="text-slate-200">${c.surface || 'Turf'}</strong></div>
+                  <div>Dimensions: <strong class="text-slate-200">${c.dimensions || 'Standard'}</strong></div>
+                  <div>Type: <strong class="text-slate-200">${c.isIndoor ? 'Indoor AC' : 'Outdoor Floodlit'}</strong></div>
+                </div>
+                <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-xs font-mono">
+                  <span class="text-emerald-400 font-bold">Base: ₹${c.baseHourlyRate}/hr</span>
+                  <span class="text-amber-400 font-bold">Peak: ₹${c.peakHourlyRate}/hr</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
         <!-- Gate Check-In Pass Verification Simulator -->
         <div class="bg-slate-900 border border-indigo-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
           <div class="flex items-center justify-between">
@@ -257,6 +292,13 @@ export class VenueOwnerPortal {
             this.render(container);
           }
         });
+      });
+    }
+
+    const btnAddCourt = container.querySelector('#btn-owner-add-court');
+    if (btnAddCourt) {
+      btnAddCourt.addEventListener('click', () => {
+        this.showAddCourtModal(container);
       });
     }
 
@@ -447,6 +489,124 @@ export class VenueOwnerPortal {
         errBox.textContent = err.message;
         errBox.classList.remove('hidden');
       }
+    });
+  }
+
+  showAddCourtModal(container) {
+    const modalContainer = container.querySelector('#walkin-modal-container');
+    modalContainer.innerHTML = `
+      <div id="add-court-backdrop" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-fade-in text-xs text-white">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div>
+              <div class="text-[10px] uppercase font-bold text-emerald-400 font-mono tracking-wider">Facility Provisioning</div>
+              <h3 class="text-xl font-black text-white">Add New Court / Pitch</h3>
+            </div>
+            <button id="btn-close-court-modal" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-sm">✕</button>
+          </div>
+
+          <form id="form-add-court" class="space-y-3.5">
+            <div>
+              <label class="block text-slate-400 font-bold mb-1">Facility / Court Name *</label>
+              <input id="input-court-name" type="text" required placeholder="e.g. Main 8v8 Box Cricket Turf" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-400 font-bold mb-1">Sport Category *</label>
+                <select id="input-court-sport" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                  <option value="cricket">🏏 Box Cricket</option>
+                  <option value="football">⚽ Football Turf</option>
+                  <option value="badminton">🏸 Badminton</option>
+                  <option value="pickleball">🏓 Pickleball</option>
+                  <option value="pool_table">🎱 Pool & Snooker</option>
+                  <option value="tennis">🎾 Lawn Tennis</option>
+                  <option value="squash">🎾 Squash</option>
+                  <option value="multi_sport">🏟️ Multi-Sport</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-slate-400 font-bold mb-1">Max Capacity (Players) *</label>
+                <input id="input-court-capacity" type="number" required min="2" max="50" value="16" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-400 font-bold mb-1">Surface Type *</label>
+                <select id="input-court-surface" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                  <option value="50mm Synthetic AstroTurf">50mm Synthetic AstroTurf</option>
+                  <option value="BWF Approved Synthetic Mat">BWF Approved Synthetic Mat</option>
+                  <option value="Cushioned Acrylic Hardcourt">Cushioned Acrylic Hardcourt</option>
+                  <option value="ASB Beechwood Flooring">ASB Beechwood Flooring</option>
+                  <option value="Natural Red Clay">Natural Red Clay</option>
+                  <option value="English Snooker Felt">English Snooker Felt</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-slate-400 font-bold mb-1">Environment *</label>
+                <select id="input-court-indoor" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                  <option value="false">Outdoor Floodlit</option>
+                  <option value="true">Indoor Air-Conditioned</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="block text-slate-400 font-bold mb-1">Base (₹/hr) *</label>
+                <input id="input-court-base" type="number" required min="300" step="50" value="1200" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+              </div>
+              <div>
+                <label class="block text-slate-400 font-bold mb-1">Peak (₹/hr) *</label>
+                <input id="input-court-peak" type="number" required min="300" step="50" value="1600" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+              </div>
+              <div>
+                <label class="block text-slate-400 font-bold mb-1">Off-Peak %</label>
+                <input id="input-court-discount" type="number" min="0" max="60" value="30" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-800 flex justify-end gap-2">
+              <button type="button" id="btn-cancel-court-modal" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition">Cancel</button>
+              <button type="submit" class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black transition shadow-md shadow-emerald-500/20">+ Add Facility</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    const close = () => { modalContainer.innerHTML = ''; };
+    modalContainer.querySelector('#btn-close-court-modal').addEventListener('click', close);
+    modalContainer.querySelector('#btn-cancel-court-modal').addEventListener('click', close);
+
+    modalContainer.querySelector('#form-add-court').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = modalContainer.querySelector('#input-court-name').value.trim();
+      const sport = modalContainer.querySelector('#input-court-sport').value;
+      const capacity = modalContainer.querySelector('#input-court-capacity').value;
+      const surface = modalContainer.querySelector('#input-court-surface').value;
+      const isIndoor = modalContainer.querySelector('#input-court-indoor').value === 'true';
+      const baseHourlyRate = modalContainer.querySelector('#input-court-base').value;
+      const peakHourlyRate = modalContainer.querySelector('#input-court-peak').value;
+      const oddHourDiscountPct = modalContainer.querySelector('#input-court-discount').value;
+
+      VenueService.addCourt({
+        venueId: this.venueId,
+        name,
+        sport,
+        capacity: Number(capacity),
+        surface,
+        isIndoor,
+        baseHourlyRate: Number(baseHourlyRate),
+        peakHourlyRate: Number(peakHourlyRate),
+        oddHourDiscountPct: Number(oddHourDiscountPct)
+      });
+
+      close();
+      this.render(container);
     });
   }
 }

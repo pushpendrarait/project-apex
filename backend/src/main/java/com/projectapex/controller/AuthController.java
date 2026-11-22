@@ -3,16 +3,19 @@ package com.projectapex.controller;
 import com.projectapex.dto.request.*;
 import com.projectapex.dto.response.ApiResponse;
 import com.projectapex.dto.response.AuthResponse;
-import com.projectapex.model.OtpSession;
+import com.projectapex.model.UserRecord;
 import com.projectapex.service.AuthService;
 import com.projectapex.service.OtpService;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
-@RequestMapping("/api/v1/auth")
+@RequestMapping("/api/v1")
+@CrossOrigin(origins = "*")
 public class AuthController {
 
     private final AuthService authService;
@@ -24,84 +27,66 @@ public class AuthController {
     }
 
     /**
-     * Dispatches Dual Registration OTPs (SMS to phone + Verification code to email)
+     * Technical Specification: Register Player Profile (ROLE_PLAYER)
      */
-    @PostMapping("/register/send-otp")
-    public ResponseEntity<ApiResponse<AuthResponse>> sendRegistrationOtp(@Valid @RequestBody SendRegistrationOtpRequest req) {
-        OtpSession session = otpService.sendRegistrationOtp(req.getPhone(), req.getEmail(), req.getDisplayName());
-        AuthResponse res = new AuthResponse();
-        res.setSessionId(session.getSessionId());
-        res.setExpiresInSeconds(300);
-        res.setSimulatedSmsOtp(session.getPhoneOtp());
-        res.setSimulatedEmailOtp(session.getEmailOtp());
-        return ResponseEntity.ok(ApiResponse.ok("Dual OTPs dispatched via SMS and Email", res));
+    @PostMapping("/auth/register-profile")
+    public ResponseEntity<ApiResponse<AuthResponse>> registerProfile(@Valid @RequestBody RegisterProfileRequest req) {
+        AuthResponse res = authService.registerProfile(req);
+        return ResponseEntity.ok(ApiResponse.ok("Player profile registered successfully", res));
     }
 
     /**
-     * Atomically verifies dual OTPs and provisions user / owner account
+     * Technical Specification: Register Facility Owner (ROLE_OWNER)
      */
-    @PostMapping("/register/verify-otp")
-    public ResponseEntity<ApiResponse<AuthResponse>> verifyAndRegister(@Valid @RequestBody VerifyRegistrationOtpRequest req) {
-        AuthResponse res = authService.verifyAndRegister(req);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok("Account verified and registered successfully", res));
+    @PostMapping("/auth/register-owner")
+    public ResponseEntity<ApiResponse<AuthResponse>> registerOwner(@Valid @RequestBody RegisterOwnerRequest req) {
+        AuthResponse res = authService.registerOwner(req);
+        return ResponseEntity.ok(ApiResponse.ok("Facility Owner registered successfully", res));
     }
 
-    /**
-     * Dispatches passwordless Login OTP
-     */
-    @PostMapping("/login/send-otp")
-    public ResponseEntity<ApiResponse<AuthResponse>> sendLoginOtp(@Valid @RequestBody SendLoginOtpRequest req) {
-        OtpSession session = otpService.sendLoginOtp(req.getIdentifier());
-        AuthResponse res = new AuthResponse();
-        res.setSessionId(session.getSessionId());
-        res.setExpiresInSeconds(300);
-        res.setSimulatedSmsOtp(session.getLoginOtp());
-        return ResponseEntity.ok(ApiResponse.ok("Login OTP dispatched successfully", res));
-    }
+    // =========================================================================
+    // Password & OTP Authentication Endpoints (Backward Compatibility)
+    // =========================================================================
 
-    /**
-     * Verifies Login OTP and issues JWT token
-     */
-    @PostMapping("/login/verify-otp")
-    public ResponseEntity<ApiResponse<AuthResponse>> verifyLoginOtp(@Valid @RequestBody VerifyLoginOtpRequest req) {
-        AuthResponse res = authService.verifyLoginOtp(req.getSessionId(), req.getOtp());
-        return ResponseEntity.ok(ApiResponse.ok("Signed in successfully", res));
-    }
-
-    /**
-     * Login with Mobile/Email and Password
-     */
-    @PostMapping("/login/password")
+    @PostMapping("/auth/login/password")
     public ResponseEntity<ApiResponse<AuthResponse>> loginWithPassword(@Valid @RequestBody LoginPasswordRequest req) {
-        AuthResponse res = authService.loginWithPassword(req.getIdentifier(), req.getPassword());
-        return ResponseEntity.ok(ApiResponse.ok("Signed in successfully with password", res));
+        AuthResponse response = authService.loginWithPassword(req.getIdentifier(), req.getPassword());
+        return ResponseEntity.ok(ApiResponse.ok("Authentication successful", response));
     }
 
-    /**
-     * Direct Registration with Password
-     */
-    @PostMapping("/register")
+    @PostMapping("/auth/register")
     public ResponseEntity<ApiResponse<AuthResponse>> registerWithPassword(@Valid @RequestBody RegisterRequest req) {
-        AuthResponse res = authService.registerWithPassword(req);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok("Account created successfully", res));
+        AuthResponse response = authService.registerWithPassword(req);
+        return ResponseEntity.ok(ApiResponse.ok("Account created successfully", response));
     }
 
-    /**
-     * Direct identifier login
-     */
-    @PostMapping("/login")
-    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody SendLoginOtpRequest req) {
-        AuthResponse res = authService.login(req.getIdentifier());
-        return ResponseEntity.ok(ApiResponse.ok("Signed in successfully", res));
+    @PostMapping("/auth/registration/send-otp")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> sendRegistrationOtp(@Valid @RequestBody SendRegistrationOtpRequest req) {
+        var session = otpService.sendRegistrationOtp(req.getPhone(), req.getEmail());
+        return ResponseEntity.ok(ApiResponse.ok("Verification OTPs dispatched", Map.of(
+                "sessionId", session.getSessionId(),
+                "expiresInSeconds", 300
+        )));
     }
 
-    /**
-     * Logout / Session termination
-     */
-    @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout() {
-        return ResponseEntity.ok(ApiResponse.ok("Logged out successfully. Transitioned to guest mode.", null));
+    @PostMapping("/auth/registration/verify-otp")
+    public ResponseEntity<ApiResponse<AuthResponse>> verifyRegistrationOtp(@Valid @RequestBody VerifyRegistrationOtpRequest req) {
+        AuthResponse response = authService.verifyAndRegister(req);
+        return ResponseEntity.ok(ApiResponse.ok("Registration verified successfully", response));
+    }
+
+    @PostMapping("/auth/login/send-otp")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> sendLoginOtp(@Valid @RequestBody SendLoginOtpRequest req) {
+        var session = otpService.sendLoginOtp(req.getIdentifier());
+        return ResponseEntity.ok(ApiResponse.ok("Login OTP dispatched", Map.of(
+                "sessionId", session.getSessionId(),
+                "expiresInSeconds", 300
+        )));
+    }
+
+    @PostMapping("/auth/login/verify-otp")
+    public ResponseEntity<ApiResponse<AuthResponse>> verifyLoginOtp(@Valid @RequestBody VerifyLoginOtpRequest req) {
+        AuthResponse response = authService.verifyLoginOtp(req.getSessionId(), req.getOtp());
+        return ResponseEntity.ok(ApiResponse.ok("Login successful", response));
     }
 }

@@ -267,6 +267,7 @@ class MockFirestoreRuntime {
           displayName: "Rohan Deshmukh",
           email: "rohan.deshmukh@apex.dev",
           phone: "+91 98201 12345",
+          password: "password123",
           role: "player",
           city: "Thane",
           loyaltyPoints: 350,
@@ -277,8 +278,18 @@ class MockFirestoreRuntime {
           displayName: "Santosh Kadam (Owner)",
           email: "santosh@apexarena.com",
           phone: "+91 98190 54321",
+          password: "password123",
           role: "venue_owner",
           venueId: "venue_thane_01"
+        },
+        "admin_01": {
+          uid: "admin_01",
+          displayName: "Apex Platform Admin",
+          email: "admin@apex.dev",
+          phone: "+91 98000 00000",
+          password: "adminpassword",
+          role: "admin",
+          city: "Mumbai"
         }
       }
     };

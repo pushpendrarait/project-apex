@@ -1,81 +1,175 @@
 package com.projectapex.model;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.ArrayList;
+import java.util.List;
 
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class UserRecord {
     private String uid;
-    private String displayName;
     private String email;
+    private String fullName;
     private String phone;
+    private String role = "ROLE_PLAYER"; // ROLE_PLAYER, ROLE_OWNER, ROLE_ADMIN
+    private String city = "Thane";
+    private List<String> preferredSports = new ArrayList<>();
+    private OwnerProfile ownerProfile;
     private String passwordHash;
-    private String role; // "player" or "venue_owner"
-    private String city;
-    private Integer loyaltyPoints;
-    private String referralCode;
-    private String venueId; // linked venue if venue_owner
-    private Boolean isPhoneVerified;
-    private Boolean isEmailVerified;
-    private String otpSessionId;
-    private Long createdAt;
-    private Long updatedAt;
+    private long loyaltyPoints = 100;
+    private boolean isPhoneVerified = true;
+    private boolean isEmailVerified = true;
+    private long createdAt = System.currentTimeMillis();
+    private long updatedAt = System.currentTimeMillis();
 
-    public UserRecord() {}
-
-    public UserRecord(String uid, String displayName, String email, String phone, String role, String city) {
-        this.uid = uid;
-        this.displayName = displayName;
-        this.email = email;
-        this.phone = phone;
-        this.role = role;
-        this.city = city;
-        this.loyaltyPoints = "player".equalsIgnoreCase(role) ? 100 : 0;
-        this.createdAt = System.currentTimeMillis();
-        this.updatedAt = this.createdAt;
+    public UserRecord() {
     }
 
-    public String getUid() { return uid; }
-    public void setUid(String uid) { this.uid = uid; }
+    public UserRecord(String uid, String email, String fullName, String phone, String role) {
+        this.uid = uid;
+        this.email = email;
+        this.fullName = fullName;
+        this.phone = phone;
+        this.role = role != null ? role : "player";
+        this.createdAt = System.currentTimeMillis();
+        this.updatedAt = System.currentTimeMillis();
+    }
 
-    public String getDisplayName() { return displayName; }
-    public void setDisplayName(String displayName) { this.displayName = displayName; }
+    // Compatibility getter
+    public String getDisplayName() {
+        return fullName;
+    }
 
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
+    public void setDisplayName(String displayName) {
+        this.fullName = displayName;
+    }
 
-    public String getPhone() { return phone; }
-    public void setPhone(String phone) { this.phone = phone; }
+    public String getUid() {
+        return uid;
+    }
 
-    public String getRole() { return role; }
-    public void setRole(String role) { this.role = role; }
+    public void setUid(String uid) {
+        this.uid = uid;
+    }
 
-    public String getCity() { return city; }
-    public void setCity(String city) { this.city = city; }
+    public String getEmail() {
+        return email;
+    }
 
-    public Integer getLoyaltyPoints() { return loyaltyPoints != null ? loyaltyPoints : 0; }
-    public void setLoyaltyPoints(Integer loyaltyPoints) { this.loyaltyPoints = loyaltyPoints; }
+    public void setEmail(String email) {
+        this.email = email;
+    }
 
-    public String getReferralCode() { return referralCode; }
-    public void setReferralCode(String referralCode) { this.referralCode = referralCode; }
+    public String getFullName() {
+        return fullName;
+    }
 
-    public String getVenueId() { return venueId; }
-    public void setVenueId(String venueId) { this.venueId = venueId; }
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
+    }
 
-    public Boolean getIsPhoneVerified() { return isPhoneVerified; }
-    public void setIsPhoneVerified(Boolean isPhoneVerified) { this.isPhoneVerified = isPhoneVerified; }
+    public String getPhone() {
+        return phone;
+    }
 
-    public Boolean getIsEmailVerified() { return isEmailVerified; }
-    public void setIsEmailVerified(Boolean isEmailVerified) { this.isEmailVerified = isEmailVerified; }
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
 
-    public String getOtpSessionId() { return otpSessionId; }
-    public void setOtpSessionId(String otpSessionId) { this.otpSessionId = otpSessionId; }
+    public String getRole() {
+        return role;
+    }
 
-    public String getPasswordHash() { return passwordHash; }
-    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public void setRole(String role) {
+        this.role = role;
+    }
 
-    public Long getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Long createdAt) { this.createdAt = createdAt; }
+    public String getCity() {
+        return city;
+    }
 
-    public Long getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(Long updatedAt) { this.updatedAt = updatedAt; }
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public List<String> getPreferredSports() {
+        return preferredSports;
+    }
+
+    public void setPreferredSports(List<String> preferredSports) {
+        this.preferredSports = preferredSports != null ? preferredSports : new ArrayList<>();
+    }
+
+    public OwnerProfile getOwnerProfile() {
+        return ownerProfile;
+    }
+
+    public void setOwnerProfile(OwnerProfile ownerProfile) {
+        this.ownerProfile = ownerProfile;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public long getLoyaltyPoints() {
+        return loyaltyPoints;
+    }
+
+    public void setLoyaltyPoints(long loyaltyPoints) {
+        this.loyaltyPoints = loyaltyPoints;
+    }
+
+    public boolean isPhoneVerified() {
+        return isPhoneVerified;
+    }
+
+    public boolean getIsPhoneVerified() {
+        return isPhoneVerified;
+    }
+
+    public void setPhoneVerified(boolean phoneVerified) {
+        isPhoneVerified = phoneVerified;
+    }
+
+    public void setIsPhoneVerified(boolean phoneVerified) {
+        isPhoneVerified = phoneVerified;
+    }
+
+    public boolean isEmailVerified() {
+        return isEmailVerified;
+    }
+
+    public boolean getIsEmailVerified() {
+        return isEmailVerified;
+    }
+
+    public void setEmailVerified(boolean emailVerified) {
+        isEmailVerified = emailVerified;
+    }
+
+    public void setIsEmailVerified(boolean emailVerified) {
+        isEmailVerified = emailVerified;
+    }
+
+    public String getVenueId() {
+        return "venue_thane_01";
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public long getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(long updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }

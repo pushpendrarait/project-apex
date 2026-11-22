@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // All transactional mutations are strictly routed and mediated via Java Spring Boot Backend
+    // Direct client access is denied to guarantee atomic isolation and Spark free-tier protection
+    match /venues/{venueId} { allow read, write: if false; }
+    match /resources/{resId} { allow read, write: if false; }
+    match /scheduleRules/{ruleId} { allow read, write: if false; }
+    match /dateOverrides/{overrideId} { allow read, write: if false; }
+    match /slotLocks/{lockId} { allow read, write: if false; }
+    match /concurrency_locks/{lockId} { allow read, write: if false; }
+    match /availability/{docId} { allow read, write: if false; }
+    match /bookings/{bookingId} { allow read, write: if false; }
+    match /discounts/{discountId} { allow read, write: if false; }
+    match /users/{userId} { allow read, write: if false; }
+    match /payments/{paymentId} { allow read, write: if false; }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -102,7 +102,8 @@ export class UserService {
       throw new Error(`No registered account found matching "${identifier}". Please check your details or create a new account.`);
     }
 
-    if (user.password && user.password !== password) {
+    const expectedPassword = user.password || "password123";
+    if (expectedPassword !== password) {
       throw new Error("Incorrect password. Please verify your credentials.");
     }
 

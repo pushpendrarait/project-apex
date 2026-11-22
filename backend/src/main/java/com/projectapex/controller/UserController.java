@@ -35,6 +35,23 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.ok(user));
     }
 
+    @PutMapping("/me")
+    public ResponseEntity<ApiResponse<UserRecord>> updateCurrentUser(@RequestBody com.projectapex.dto.request.RegisterProfileRequest req,
+                                                                     Authentication auth) {
+        String uid = auth != null && auth.getName() != null && !"anonymousUser".equals(auth.getName())
+                ? auth.getName()
+                : "demo_player";
+        UserRecord user = firebaseService.getUsers().get(uid);
+        if (user != null) {
+            if (req.getFullName() != null) user.setFullName(req.getFullName());
+            if (req.getPhone() != null) user.setPhone(req.getPhone());
+            if (req.getCity() != null) user.setCity(req.getCity());
+            if (req.getPreferredSports() != null) user.setPreferredSports(req.getPreferredSports());
+            user.setUpdatedAt(System.currentTimeMillis());
+        }
+        return ResponseEntity.ok(ApiResponse.ok("Profile updated", user));
+    }
+
     @GetMapping("/{uid}")
     public ResponseEntity<ApiResponse<UserRecord>> getUserById(@PathVariable String uid) {
         UserRecord user = firebaseService.getUsers().get(uid);

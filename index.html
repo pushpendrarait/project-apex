@@ -556,11 +556,86 @@
         if (btnBackend) {
           btnBackend.addEventListener('click', async () => {
             const health = await ApiClient.checkHealth();
-            if (health.isOnline) {
-              alert(`🟢 Java Spring Boot Middleware is CONNECTED & ACTIVE!\n\n• Service: ${health.data?.data?.service || 'project-apex-backend'}\n• Endpoint: ${ApiClient.getBaseUrl()}\n• Runtime: Java 21 LTS + Spring Boot 3.2.x\n• Database: Cloud Firestore (project-apex-pushp)\n• Port: 8080`);
-            } else {
-              alert(`ℹ️ Project Apex Cloud Mode (Firestore Direct)\n\n• Backend URL: ${ApiClient.getBaseUrl()}\n• Status: ${health.error || 'Blocked / Offline'}\n\nWhy this happens on Firebase Hosting:\nModern web browsers enforce a "Mixed Content Security Policy" that blocks HTTPS sites (https://project-apex-pushp.web.app) from calling insecure HTTP localhost (http://localhost:8080).\n\nTo interact directly with the Java middleware on port 8080:\n👉 Run the frontend locally via:\n   npm run dev\n   and open http://localhost:3000 (HTTP to HTTP connects seamlessly!)`);
+            const currentUrl = ApiClient.getBaseUrl();
+            
+            let modal = document.getElementById('apex-backend-modal');
+            if (!modal) {
+              modal = document.createElement('div');
+              modal.id = 'apex-backend-modal';
+              modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in text-xs text-white';
+              document.body.appendChild(modal);
             }
+
+            modal.innerHTML = `
+              <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full ${health.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}"></span>
+                    <h3 class="text-lg font-black">${health.isOnline ? 'Java Middleware Connected' : 'Java Middleware Endpoint'}</h3>
+                  </div>
+                  <button id="btn-close-backend-modal" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center">✕</button>
+                </div>
+
+                <div class="p-3 rounded-2xl ${health.isOnline ? 'bg-emerald-950/60 border border-emerald-500/30 text-emerald-300' : 'bg-amber-950/60 border border-amber-500/30 text-amber-300'}">
+                  <div class="font-bold mb-1">${health.isOnline ? '🟢 Connected to Java Spring Boot Backend' : 'ℹ️ Backend Offline or Blocked by Browser'}</div>
+                  <p class="text-[11px] ${health.isOnline ? 'text-emerald-400' : 'text-slate-300'}">
+                    ${health.isOnline 
+                      ? `Service: ${health.data?.data?.service || 'project-apex-backend'} (Port 8080) • Cloud Firestore Connected` 
+                      : `Browsers block HTTPS sites from calling HTTP localhost directly (Mixed Content). To connect locally: run 'npm run dev' & open http://localhost:3000, or enter a tunnel/public URL below.`}
+                  </p>
+                </div>
+
+                <div>
+                  <label class="block font-bold uppercase tracking-wider text-slate-400 mb-1">Backend API Base URL</label>
+                  <input id="input-backend-url" type="url" value="${currentUrl}" placeholder="http://localhost:8080/api/v1" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 font-mono text-xs text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+                </div>
+
+                <div id="backend-ping-result" class="hidden text-[11px] p-2.5 rounded-xl"></div>
+
+                <div class="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                  <button type="button" id="btn-reset-backend-url" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold transition">Reset to Default</button>
+                  <div class="flex gap-2">
+                    <button type="button" id="btn-test-backend-ping" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition">Test Ping</button>
+                    <button type="button" id="btn-save-backend-url" class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition">Save & Apply</button>
+                  </div>
+                </div>
+              </div>
+            `;
+
+            const close = () => modal.remove();
+            modal.querySelector('#btn-close-backend-modal').addEventListener('click', close);
+
+            const inputUrl = modal.querySelector('#input-backend-url');
+            const pingResult = modal.querySelector('#backend-ping-result');
+
+            modal.querySelector('#btn-reset-backend-url').addEventListener('click', () => {
+              inputUrl.value = 'http://localhost:8080/api/v1';
+            });
+
+            modal.querySelector('#btn-test-backend-ping').addEventListener('click', async () => {
+              pingResult.className = 'text-[11px] p-2.5 rounded-xl bg-slate-800 text-slate-300 block';
+              pingResult.textContent = 'Pinging ' + inputUrl.value + '/health...';
+              try {
+                const res = await fetch(`${inputUrl.value.trim()}/health`, { method: 'GET', signal: AbortSignal.timeout(3000) });
+                if (res.ok) {
+                  const data = await res.json();
+                  pingResult.className = 'text-[11px] p-2.5 rounded-xl bg-emerald-950 border border-emerald-500/40 text-emerald-300 block';
+                  pingResult.textContent = `✓ 200 OK! Backend responded: ${JSON.stringify(data.data || data)}`;
+                } else {
+                  pingResult.className = 'text-[11px] p-2.5 rounded-xl bg-red-950 border border-red-500/40 text-red-300 block';
+                  pingResult.textContent = `HTTP ${res.status}: Failed to ping health endpoint`;
+                }
+              } catch (err) {
+                pingResult.className = 'text-[11px] p-2.5 rounded-xl bg-red-950 border border-red-500/40 text-red-300 block';
+                pingResult.textContent = `Error: ${err.message}`;
+              }
+            });
+
+            modal.querySelector('#btn-save-backend-url').addEventListener('click', async () => {
+              ApiClient.setBaseUrl(inputUrl.value.trim());
+              await this.checkBackendStatus();
+              close();
+            });
           });
         }
 

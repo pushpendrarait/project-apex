@@ -56,6 +56,10 @@ public class OtpService {
         return EMAIL_PATTERN.matcher(email.trim()).matches();
     }
 
+    public OtpSession sendRegistrationOtp(String rawPhone, String rawEmail) {
+        return sendRegistrationOtp(rawPhone, rawEmail, "Sports Player");
+    }
+
     /**
      * Dispatches Dual OTPs: 6-digit Mobile SMS OTP + 6-digit Email Verification Code
      */
