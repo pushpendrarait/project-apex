@@ -315,17 +315,42 @@
         const avatar = document.getElementById('header-user-avatar');
         const nameEl = document.getElementById('header-user-name');
         const roleEl = document.getElementById('header-user-role');
-        if (avatar && user) {
-          avatar.textContent = user.displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-        }
-        if (nameEl && user) {
-          nameEl.textContent = user.displayName.split(' ')[0];
-        }
-        if (roleEl && user) {
-          roleEl.textContent = user.role === 'venue_owner' ? 'Owner' : 'Player';
-          roleEl.className = user.role === 'venue_owner'
-            ? 'text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-indigo-950 text-indigo-300 border border-indigo-800 hidden lg:inline'
-            : 'text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 hidden lg:inline';
+        const authBtn = document.getElementById('btn-header-auth');
+
+        if (user) {
+          if (avatar) {
+            avatar.textContent = user.displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+            avatar.className = user.role === 'venue_owner'
+              ? 'w-6 h-6 rounded-lg bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 font-black text-[11px] flex items-center justify-center'
+              : 'w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-black text-[11px] flex items-center justify-center';
+          }
+          if (nameEl) {
+            nameEl.textContent = user.displayName.split(' ')[0];
+          }
+          if (roleEl) {
+            roleEl.textContent = user.role === 'venue_owner' ? 'Owner' : 'Player';
+            roleEl.className = user.role === 'venue_owner'
+              ? 'text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-indigo-950 text-indigo-300 border border-indigo-800 hidden lg:inline'
+              : 'text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 hidden lg:inline';
+          }
+          if (authBtn) {
+            authBtn.innerHTML = `<span>👤 ${user.displayName.split(' ')[0]}</span>`;
+          }
+        } else {
+          if (avatar) {
+            avatar.textContent = '👤';
+            avatar.className = 'w-6 h-6 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 font-black text-[11px] flex items-center justify-center';
+          }
+          if (nameEl) {
+            nameEl.textContent = 'Guest';
+          }
+          if (roleEl) {
+            roleEl.textContent = 'Guest';
+            roleEl.className = 'text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-slate-800 text-slate-400 border border-slate-700 hidden lg:inline';
+          }
+          if (authBtn) {
+            authBtn.innerHTML = `<span>🔑 Login / Register</span>`;
+          }
         }
       }
 

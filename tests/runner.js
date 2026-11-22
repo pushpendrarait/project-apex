@@ -444,6 +444,42 @@ async function runTests() {
   });
   assert(loginVerify.success === true && loginVerify.user.uid === verifiedUser.uid, 'Passwordless Login OTP verified and session activated');
 
+  // 8. User Data Isolation: Ensure user only sees their own bookings
+  const initialUserBookings = BookingService.getPlayerBookings(verifiedUser.uid);
+  assert(Array.isArray(initialUserBookings) && initialUserBookings.length === 0, 'New verified user has 0 initial bookings (strict user isolation)');
+
+  // Commit a booking exclusively for verifiedUser
+  const isolationTestCourt = VenueService.getCourtsForVenue('venue_thane_01')[0];
+  await ConcurrencyService.acquireLock({
+    courtId: isolationTestCourt.courtId,
+    date: '2026-11-30',
+    slot: '11:00',
+    userId: verifiedUser.uid
+  });
+  const userBooking = await BookingService.commitBooking({
+    userId: verifiedUser.uid,
+    userName: verifiedUser.displayName,
+    userPhone: verifiedUser.phone,
+    venueId: 'venue_thane_01',
+    venueName: 'Apex Arena Ghodbunder',
+    courtId: isolationTestCourt.courtId,
+    courtName: isolationTestCourt.name,
+    sport: 'cricket',
+    date: '2026-11-30',
+    slot: '11:00',
+    pricing: { baseRate: 1200, total: 1220, isOddHour: false },
+    paymentMethod: 'UPI'
+  });
+  const updatedUserBookings = BookingService.getPlayerBookings(verifiedUser.uid);
+  assert(updatedUserBookings.length === 1 && updatedUserBookings[0].bookingId === userBooking.booking.bookingId, 'User portal retrieves strictly their own bookings');
+  assert(updatedUserBookings.every(b => b.userId === verifiedUser.uid), 'Zero data leakage from other user bookings');
+
+  // 9. Sign Out & Re-authentication Session Verification
+  UserService.logout();
+  assert(UserService.getCurrentUser() === null, 'UserService.logout sets session to null (guest mode)');
+  UserService.setCurrentUser(verifiedUser.uid);
+  assert(UserService.getCurrentUser().uid === verifiedUser.uid, 'Active session restored to verified user');
+
   // Summary
   console.log('\n======================================================');
   console.log(`🏁 TEST RESULTS: ${passedTests}/${totalTests} PASSED (100%)`);

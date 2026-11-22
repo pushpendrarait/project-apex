@@ -387,7 +387,23 @@ export class SlotCalendar {
         btnLock.innerHTML = `<span class="animate-spin inline-block mr-2">⏳</span> Acquiring Atomic Lock...`;
 
         try {
-          const currentUser = UserService.getCurrentUser();
+          let currentUser = UserService.getCurrentUser();
+          if (!currentUser) {
+            import('./UserAuthModal.js').then(({ UserAuthModal }) => {
+              UserAuthModal.show({
+                initialTab: 'signin',
+                onUserChanged: (newUser) => {
+                  if (newUser && btnLock) {
+                    btnLock.click();
+                  }
+                }
+              });
+            });
+            btnLock.disabled = false;
+            btnLock.innerHTML = `<span>🔒 Lock Slot & Proceed (5-min Lease)</span> <span>→</span>`;
+            return;
+          }
+
           // Acquire Phase 1 5-minute atomic lock lease
           const lockResult = await ConcurrencyService.acquireLock({
             courtId: this.selectedCourt.courtId,

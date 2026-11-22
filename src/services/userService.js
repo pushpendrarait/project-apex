@@ -22,6 +22,9 @@ export class UserService {
    * Retrieves the currently active logged-in user
    */
   static getCurrentUser() {
+    if (this.activeUserUid === null) {
+      return null;
+    }
     let activeUid = this.activeUserUid;
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem(ACTIVE_USER_KEY);

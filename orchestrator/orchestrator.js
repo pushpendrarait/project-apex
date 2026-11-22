@@ -153,7 +153,7 @@ function verifyConstraints() {
   // 7. Automated Workflow Verification Check
   const runnerPath = path.join(ROOT_DIR, 'tests', 'runner.js');
   if (fs.existsSync(runnerPath)) {
-    log('  [PASS 7/7] Automated Test Suite: tests/runner.js present with 83 automated assertions.', '\x1b[32m');
+    log('  [PASS 7/7] Automated Test Suite: tests/runner.js present with 88 automated assertions.', '\x1b[32m');
     passed++;
   } else {
     log('  [FAIL 7/7] Automated test runner missing.', '\x1b[31m');

@@ -18,6 +18,94 @@ export class VenueOwnerPortal {
   }
 
   render(container) {
+    const currentUser = UserService.getCurrentUser();
+
+    // If not signed in
+    if (!currentUser) {
+      container.innerHTML = `
+        <div class="max-w-xl mx-auto py-12 px-4 text-center space-y-6 animate-fade-in">
+          <div class="w-20 h-20 mx-auto rounded-3xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center text-4xl shadow-xl shadow-indigo-500/10">
+            🏢
+          </div>
+          <div class="space-y-2">
+            <h2 class="text-2xl font-black text-white">Partner Portal Access</h2>
+            <p class="text-sm text-slate-400">
+              Please sign in as a Facility Owner or register your turf venue to access gate check-in, match ledgers, and walk-in reservations.
+            </p>
+          </div>
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button id="btn-partner-login" class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-sm shadow-xl shadow-indigo-600/20 transition active:scale-95">
+              🏢 Partner Sign In / Register
+            </button>
+            <button id="btn-partner-explore" class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm transition">
+              ← Switch to Player View
+            </button>
+          </div>
+        </div>
+      `;
+
+      container.querySelector('#btn-partner-login').addEventListener('click', () => {
+        import('./UserAuthModal.js').then(({ UserAuthModal }) => {
+          UserAuthModal.show({
+            initialTab: 'owner',
+            onUserChanged: () => {
+              this.render(container);
+            }
+          });
+        });
+      });
+
+      container.querySelector('#btn-partner-explore').addEventListener('click', () => {
+        if (this.onBack) this.onBack();
+      });
+
+      return;
+    }
+
+    // If signed in as player
+    if (currentUser.role !== 'venue_owner') {
+      container.innerHTML = `
+        <div class="max-w-xl mx-auto py-12 px-4 text-center space-y-6 animate-fade-in">
+          <div class="w-20 h-20 mx-auto rounded-3xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center text-4xl shadow-xl shadow-indigo-500/10">
+            🏢
+          </div>
+          <div class="space-y-2">
+            <h2 class="text-2xl font-black text-white">Partner Access Required</h2>
+            <p class="text-sm text-slate-400">
+              You are currently signed in as a Player (<strong class="text-emerald-400">${currentUser.displayName}</strong>). To manage turf schedules and scan gate passes, please register as a Facility Owner.
+            </p>
+          </div>
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button id="btn-partner-register" class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-sm shadow-xl shadow-indigo-600/20 transition active:scale-95">
+              + Register as Facility Owner
+            </button>
+            <button id="btn-partner-explore" class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm transition">
+              ← Back to Player View
+            </button>
+          </div>
+        </div>
+      `;
+
+      container.querySelector('#btn-partner-register').addEventListener('click', () => {
+        import('./UserAuthModal.js').then(({ UserAuthModal }) => {
+          UserAuthModal.show({
+            initialTab: 'owner',
+            onUserChanged: () => {
+              this.render(container);
+            }
+          });
+        });
+      });
+
+      container.querySelector('#btn-partner-explore').addEventListener('click', () => {
+        if (this.onBack) this.onBack();
+      });
+
+      return;
+    }
+
+    this.ownerId = currentUser.uid;
+    this.venueId = currentUser.venueId || this.venueId;
     const venue = VenueService.getVenueById(this.venueId) || Object.values(mockDb.data.venues)[0];
     this.venueId = venue.venueId;
     const courts = VenueService.getCourtsForVenue(this.venueId);
