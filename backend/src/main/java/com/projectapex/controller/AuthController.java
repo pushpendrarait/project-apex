@@ -70,6 +70,25 @@ public class AuthController {
     }
 
     /**
+     * Login with Mobile/Email and Password
+     */
+    @PostMapping("/login/password")
+    public ResponseEntity<ApiResponse<AuthResponse>> loginWithPassword(@Valid @RequestBody LoginPasswordRequest req) {
+        AuthResponse res = authService.loginWithPassword(req.getIdentifier(), req.getPassword());
+        return ResponseEntity.ok(ApiResponse.ok("Signed in successfully with password", res));
+    }
+
+    /**
+     * Direct Registration with Password
+     */
+    @PostMapping("/register")
+    public ResponseEntity<ApiResponse<AuthResponse>> registerWithPassword(@Valid @RequestBody RegisterRequest req) {
+        AuthResponse res = authService.registerWithPassword(req);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok("Account created successfully", res));
+    }
+
+    /**
      * Direct identifier login
      */
     @PostMapping("/login")

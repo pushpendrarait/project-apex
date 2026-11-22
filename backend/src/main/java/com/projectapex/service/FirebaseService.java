@@ -166,16 +166,35 @@ public class FirebaseService {
         player.setReferralCode("ROHAN50");
         player.setIsPhoneVerified(true);
         player.setIsEmailVerified(true);
+        player.setPasswordHash(hashPassword("password123"));
         users.put(player.getUid(), player);
 
         UserRecord owner = new UserRecord("demo_owner", "Santosh Kadam", "santosh@apexarena.com", "+91 98190 54321", "venue_owner", "Thane");
         owner.setVenueId("venue_thane_01");
         owner.setIsPhoneVerified(true);
         owner.setIsEmailVerified(true);
+        owner.setPasswordHash(hashPassword("password123"));
         users.put(owner.getUid(), owner);
 
         log.info("Initialized Project Apex hosted state: {} venues, {} facilities, {} users",
                 venues.size(), courts.size(), users.size());
+    }
+
+    public static String hashPassword(String password) {
+        if (password == null || password.trim().isEmpty()) return null;
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest((password + "apex_salt_2026").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) {
+            return String.valueOf(password.hashCode());
+        }
     }
 
     // Getters for in-memory collections

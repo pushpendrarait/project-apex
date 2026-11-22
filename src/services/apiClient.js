@@ -4,15 +4,44 @@
  * with automatic fallback to local runtime if offline
  */
 
-const API_BASE_URL = typeof window !== 'undefined' && window.APEX_API_URL 
+let customApiBaseUrl = typeof window !== 'undefined' && window.APEX_API_URL 
   ? window.APEX_API_URL 
-  : 'http://localhost:8080/api/v1';
+  : (typeof window !== 'undefined' && window.localStorage?.getItem('apex_custom_api_url') 
+      ? window.localStorage.getItem('apex_custom_api_url') 
+      : 'http://localhost:8080/api/v1');
 
 const TOKEN_KEY = 'apex_jwt_token';
 const ACTIVE_USER_KEY = 'apex_active_user_id';
 let memoryToken = null;
 
 export class ApiClient {
+  static getBaseUrl() {
+    return customApiBaseUrl;
+  }
+
+  static setBaseUrl(url) {
+    if (url && url.trim()) {
+      customApiBaseUrl = url.trim();
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('apex_custom_api_url', customApiBaseUrl);
+      }
+    }
+  }
+
+  static async checkHealth() {
+    try {
+      const url = `${this.getBaseUrl()}/health`;
+      const res = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const data = await res.json();
+        return { isOnline: true, data };
+      }
+      return { isOnline: false, error: `HTTP ${res.status}` };
+    } catch (e) {
+      return { isOnline: false, error: e.message };
+    }
+  }
+
   static getToken() {
     if (typeof localStorage !== 'undefined') {
       return localStorage.getItem(TOKEN_KEY) || memoryToken;
@@ -45,7 +74,7 @@ export class ApiClient {
   }
 
   static async request(endpoint, options = {}) {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const url = `${this.getBaseUrl()}${endpoint}`;
     const config = {
       ...options,
       headers: {
@@ -69,6 +98,28 @@ export class ApiClient {
   }
 
   // --- Auth APIs ---
+  static async loginWithPassword({ identifier, password }) {
+    const res = await this.request('/auth/login/password', {
+      method: 'POST',
+      body: JSON.stringify({ identifier, password })
+    });
+    if (res.data?.token) {
+      this.setToken(res.data.token);
+    }
+    return res;
+  }
+
+  static async registerWithPassword(payload) {
+    const res = await this.request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (res.data?.token) {
+      this.setToken(res.data.token);
+    }
+    return res;
+  }
+
   static async sendRegistrationOtp({ phone, email, displayName }) {
     return this.request('/auth/register/send-otp', {
       method: 'POST',

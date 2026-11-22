@@ -5,11 +5,12 @@
 
 import { mockDb } from './firebaseConfig.js';
 import { VenueService } from './venueService.js';
+import { ApiClient } from './apiClient.js';
 
 const ACTIVE_USER_KEY = 'apex_active_user_id';
 
 export class UserService {
-  static activeUserUid = 'demo_player';
+  static activeUserUid = null;
 
   /**
    * Checks if an authenticated user session exists
@@ -19,23 +20,22 @@ export class UserService {
   }
 
   /**
-   * Retrieves the currently active logged-in user
+   * Retrieves the currently active logged-in user (null = Guest mode)
    */
   static getCurrentUser() {
-    if (this.activeUserUid === null) {
-      return null;
-    }
     let activeUid = this.activeUserUid;
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem(ACTIVE_USER_KEY);
-      if (stored === 'guest') {
+      if (!stored || stored === 'guest') {
+        this.activeUserUid = null;
         return null;
       }
-      if (stored && mockDb.data.users[stored]) {
-        activeUid = stored;
+      if (mockDb.data.users[stored]) {
+        this.activeUserUid = stored;
+        return mockDb.data.users[stored];
       }
     }
-    return mockDb.data.users[activeUid] || mockDb.data.users['demo_player'];
+    return activeUid && mockDb.data.users[activeUid] ? mockDb.data.users[activeUid] : null;
   }
 
   /**
@@ -58,6 +58,129 @@ export class UserService {
       localStorage.setItem(ACTIVE_USER_KEY, uid);
     }
     return mockDb.data.users[uid];
+  }
+
+  /**
+   * Signs in a user by phone/email and password (interacts with Java backend first)
+   */
+  static async loginWithPassword({ identifier, password }) {
+    if (!identifier || !identifier.trim()) {
+      throw new Error("Phone number or email is required.");
+    }
+    if (!password || !password.trim()) {
+      throw new Error("Password is required.");
+    }
+
+    const clean = identifier.trim().toLowerCase();
+
+    // 1. Try Java Spring Boot backend first
+    try {
+      const res = await ApiClient.loginWithPassword({ identifier: clean, password });
+      if (res && res.data && res.data.user) {
+        const backendUser = { ...res.data.user, password };
+        mockDb.data.users[backendUser.uid] = backendUser;
+        mockDb.persist();
+        this.setCurrentUser(backendUser.uid);
+        return { user: backendUser, token: res.data.token, source: 'backend' };
+      }
+    } catch (backendErr) {
+      console.warn('[UserService] Java backend password login fallback:', backendErr.message);
+      // If error was 400 with invalid credentials, rethrow
+      if (backendErr.message.includes('Incorrect password') || backendErr.message.includes('No account registered')) {
+        throw backendErr;
+      }
+    }
+
+    // 2. Local database fallback
+    const user = Object.values(mockDb.data.users).find(u => 
+      (u.email && u.email.toLowerCase() === clean) ||
+      (u.phone && u.phone.replace(/[\s+-]/g, '').includes(clean.replace(/[\s+-]/g, ''))) ||
+      (u.uid && u.uid.toLowerCase() === clean)
+    );
+
+    if (!user) {
+      throw new Error(`No registered account found matching "${identifier}". Please check your details or create a new account.`);
+    }
+
+    if (user.password && user.password !== password) {
+      throw new Error("Incorrect password. Please verify your credentials.");
+    }
+
+    this.setCurrentUser(user.uid);
+    return { user, token: null, source: 'local' };
+  }
+
+  /**
+   * Registers a user with Password (interacts with Java backend first)
+   */
+  static async registerWithPassword({
+    displayName,
+    phone,
+    email,
+    password,
+    role = 'player',
+    city = 'Thane',
+    facilityName = null,
+    area = null,
+    sports = ['cricket'],
+    startingPrice = 1200
+  }) {
+    if (!displayName || !displayName.trim()) throw new Error("Full Name is required.");
+    if (!phone || !phone.trim()) throw new Error("Mobile number is required.");
+    if (!email || !email.trim()) throw new Error("Email address is required.");
+    if (!password || password.length < 6) throw new Error("Password must be at least 6 characters.");
+
+    // 1. Try Java Spring Boot backend first
+    try {
+      const res = await ApiClient.registerWithPassword({
+        displayName,
+        phone,
+        email,
+        password,
+        role,
+        city,
+        facilityName,
+        area,
+        sports,
+        startingPrice: Number(startingPrice) || 1200
+      });
+
+      if (res && res.data && res.data.user) {
+        const backendUser = { ...res.data.user, password };
+        mockDb.data.users[backendUser.uid] = backendUser;
+        mockDb.persist();
+        this.setCurrentUser(backendUser.uid);
+        return { user: backendUser, token: res.data.token, source: 'backend' };
+      }
+    } catch (backendErr) {
+      console.warn('[UserService] Java backend register fallback:', backendErr.message);
+    }
+
+    // 2. Local database fallback
+    if (role === 'venue_owner') {
+      const ownerRes = this.registerFacilityOwner({
+        displayName,
+        phone,
+        email,
+        password,
+        city,
+        facilityName: facilityName || `${displayName}'s Sports Turf`,
+        area: area || 'Central Area',
+        sports,
+        startingPrice: Number(startingPrice) || 1200
+      });
+      return { user: ownerRes.user, venue: ownerRes.venue, source: 'local' };
+    } else {
+      const player = this.createUser({
+        displayName,
+        phone,
+        email,
+        password,
+        role: 'player',
+        city
+      });
+      return { user: player, source: 'local' };
+    }
   }
 
   /**
@@ -116,6 +239,7 @@ export class UserService {
     displayName,
     email,
     phone,
+    password = null,
     role = 'player', // 'player' | 'venue_owner' | 'admin'
     city = 'Thane',
     venueId = null,
@@ -147,6 +271,7 @@ export class UserService {
       displayName: cleanName,
       email: cleanEmail,
       phone: cleanPhone,
+      password: password || 'password123',
       role,
       city,
       isPhoneVerified: !!isPhoneVerified,
@@ -188,6 +313,7 @@ export class UserService {
     displayName,
     phone,
     email,
+    password = null,
     city = 'Thane',
     facilityName,
     area,
@@ -211,6 +337,7 @@ export class UserService {
       displayName,
       phone,
       email,
+      password,
       role: 'venue_owner',
       city,
       isPhoneVerified,

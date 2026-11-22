@@ -8,6 +8,7 @@ public class UserRecord {
     private String displayName;
     private String email;
     private String phone;
+    private String passwordHash;
     private String role; // "player" or "venue_owner"
     private String city;
     private Integer loyaltyPoints;
@@ -68,6 +69,9 @@ public class UserRecord {
 
     public String getOtpSessionId() { return otpSessionId; }
     public void setOtpSessionId(String otpSessionId) { this.otpSessionId = otpSessionId; }
+
+    public String getPasswordHash() { return passwordHash; }
+    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
 
     public Long getCreatedAt() { return createdAt; }
     public void setCreatedAt(Long createdAt) { this.createdAt = createdAt; }

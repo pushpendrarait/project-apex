@@ -184,12 +184,18 @@
             <span>+ List Venue</span>
           </button>
 
-          <button id="btn-quick-player" class="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-xs transition" title="Switch or Create User Profile">
-            <div id="header-user-avatar" class="w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-black text-[11px] flex items-center justify-center">
-              RD
+          <!-- Java Middleware Status Indicator -->
+          <button id="btn-header-backend" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-[11px] font-mono text-slate-300 transition" title="Java Spring Boot Backend Status">
+            <span id="header-backend-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <span id="header-backend-label">Backend</span>
+          </button>
+
+          <button id="btn-quick-player" class="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-xs transition" title="Account / Profile">
+            <div id="header-user-avatar" class="w-6 h-6 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 font-black text-[11px] flex items-center justify-center">
+              👤
             </div>
-            <span id="header-user-name" class="font-bold text-white text-xs hidden lg:inline">Rohan</span>
-            <span id="header-user-role" class="text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-slate-800 text-emerald-400 hidden xl:inline">Player</span>
+            <span id="header-user-name" class="font-bold text-white text-xs hidden lg:inline">Guest</span>
+            <span id="header-user-role" class="text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-slate-800 text-slate-400 hidden xl:inline">Guest</span>
             <span class="text-[10px] text-slate-400">▾</span>
           </button>
         </div>
@@ -293,6 +299,7 @@
     import { AddVenueModal } from './src/components/AddVenueModal.js';
     import { UserAuthModal } from './src/components/UserAuthModal.js';
     import { ScenarioRunnerModal } from './src/components/ScenarioRunnerModal.js';
+    import { ApiClient } from './src/services/apiClient.js';
 
     class ApexApp {
       constructor() {
@@ -309,8 +316,33 @@
         this.bindNavEvents();
         this.bindHeaderLocationAndSearch();
         this.bindLegalEvents();
+        this.checkBackendHealth();
         this.registerServiceWorker();
         this.renderView('explore');
+      }
+
+      async checkBackendHealth() {
+        const dot = document.getElementById('header-backend-dot');
+        const label = document.getElementById('header-backend-label');
+        try {
+          const health = await ApiClient.checkHealth();
+          if (dot && label) {
+            if (health.isOnline) {
+              dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+              label.textContent = 'Java: Online';
+              label.className = 'text-emerald-400 font-bold';
+            } else {
+              dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+              label.textContent = 'Cloud Mode';
+              label.className = 'text-slate-400';
+            }
+          }
+        } catch (e) {
+          if (dot && label) {
+            dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+            label.textContent = 'Cloud Mode';
+          }
+        }
       }
 
       updateHeaderUser() {
@@ -517,6 +549,18 @@
                 setTabActive(view);
               }
             });
+          });
+        }
+
+        const btnBackend = document.getElementById('btn-header-backend');
+        if (btnBackend) {
+          btnBackend.addEventListener('click', async () => {
+            const health = await ApiClient.checkHealth();
+            if (health.isOnline) {
+              alert(`🟢 Java Spring Boot Middleware is CONNECTED & ACTIVE!\n\n• Service: ${health.data?.data?.service || 'project-apex-backend'}\n• Endpoint: ${ApiClient.getBaseUrl()}\n• Runtime: Java 21 LTS + Spring Boot 3.2.x\n• Database: Cloud Firestore (project-apex-pushp)\n• Port: 8080`);
+            } else {
+              alert(`ℹ️ Project Apex Cloud Mode (Firestore Direct)\n\n• Backend URL: ${ApiClient.getBaseUrl()}\n• Status: ${health.error || 'Blocked / Offline'}\n\nWhy this happens on Firebase Hosting:\nModern web browsers enforce a "Mixed Content Security Policy" that blocks HTTPS sites (https://project-apex-pushp.web.app) from calling insecure HTTP localhost (http://localhost:8080).\n\nTo interact directly with the Java middleware on port 8080:\n👉 Run the frontend locally via:\n   npm run dev\n   and open http://localhost:3000 (HTTP to HTTP connects seamlessly!)`);
+            }
           });
         }
 

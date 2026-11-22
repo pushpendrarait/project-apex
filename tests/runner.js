@@ -492,6 +492,9 @@ async function runTests() {
   assert(typeof ApiClient.verifyRegistrationOtp === 'function', 'ApiClient exposes verifyRegistrationOtp');
   assert(typeof ApiClient.sendLoginOtp === 'function', 'ApiClient exposes sendLoginOtp');
   assert(typeof ApiClient.verifyLoginOtp === 'function', 'ApiClient exposes verifyLoginOtp');
+  assert(typeof ApiClient.loginWithPassword === 'function', 'ApiClient exposes loginWithPassword');
+  assert(typeof ApiClient.registerWithPassword === 'function', 'ApiClient exposes registerWithPassword');
+  assert(typeof ApiClient.checkHealth === 'function', 'ApiClient exposes checkHealth');
   assert(typeof ApiClient.createRazorpayOrder === 'function', 'ApiClient exposes createRazorpayOrder');
   assert(typeof ApiClient.commitBooking === 'function', 'ApiClient exposes commitBooking');
   assert(typeof ApiClient.createFacility === 'function', 'ApiClient exposes createFacility');
@@ -522,6 +525,30 @@ async function runTests() {
   assert(fs.existsSync(backendPom), 'Java backend pom.xml present and configured');
   assert(fs.existsSync(backendApp), 'Java Spring Boot Application entrypoint present');
   assert(fs.existsSync(backendRazorpay), 'Razorpay Java SDK service present');
+
+  // 5. Password Authentication & Registration
+  const pwUser = await UserService.registerWithPassword({
+    displayName: 'Shreyas Iyer',
+    phone: '+91 98999 11223',
+    email: 'shreyas.iyer@apex.dev',
+    password: 'Password@123',
+    city: 'Mumbai',
+    role: 'player'
+  });
+  assert(pwUser && pwUser.user.displayName === 'Shreyas Iyer', 'UserService registers user with password');
+  assert(pwUser.user.passwordHash || pwUser.user.password, 'User profile persists password / password hash');
+  const pwLogin = await UserService.loginWithPassword({
+    identifier: 'shreyas.iyer@apex.dev',
+    password: 'Password@123'
+  });
+  assert(pwLogin && pwLogin.user.uid === pwUser.user.uid, 'UserService logs in with email and password');
+  let wrongPwRejected = false;
+  try {
+    await UserService.loginWithPassword({ identifier: 'shreyas.iyer@apex.dev', password: 'wrong' });
+  } catch (e) {
+    wrongPwRejected = true;
+  }
+  assert(wrongPwRejected, 'UserService rejects incorrect password');
 
   // Summary
   console.log('\n======================================================');

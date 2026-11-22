@@ -241,4 +241,40 @@ class BackendApplicationTests {
         assertThrows(IllegalStateException.class, () ->
                 bookingService.verifyGatePass(cancelled.getQrPassToken(), "owner_01"));
     }
+
+    @Test
+    @DisplayName("Workflow 7: Password-Based Registration & Authentication")
+    void testPasswordAuthentication() {
+        // 1. Direct registration with password
+        RegisterRequest req = new RegisterRequest();
+        req.setDisplayName("Hardik Pandya");
+        req.setEmail("hardik.pandya@apex.dev");
+        req.setPhone("+91 98777 66554");
+        req.setPassword("Hardik@123");
+        req.setCity("Mumbai");
+        req.setRole("player");
+
+        AuthResponse regRes = authService.registerWithPassword(req);
+        assertNotNull(regRes.getToken());
+        assertEquals("Hardik Pandya", regRes.getUser().getDisplayName());
+        assertNotNull(regRes.getUser().getPasswordHash());
+
+        // 2. Successful Login with password
+        AuthResponse loginRes = authService.loginWithPassword("hardik.pandya@apex.dev", "Hardik@123");
+        assertNotNull(loginRes.getToken());
+        assertEquals(regRes.getUser().getUid(), loginRes.getUser().getUid());
+
+        // 3. Login by Phone and password
+        AuthResponse loginPhoneRes = authService.loginWithPassword("+91 98777 66554", "Hardik@123");
+        assertNotNull(loginPhoneRes.getToken());
+
+        // 4. Reject wrong password
+        assertThrows(IllegalArgumentException.class, () ->
+                authService.loginWithPassword("hardik.pandya@apex.dev", "WrongPassword999"));
+
+        // 5. Seeded user password login
+        AuthResponse seededRes = authService.loginWithPassword("rohan.deshmukh@apex.dev", "password123");
+        assertNotNull(seededRes.getToken());
+        assertEquals("demo_player", seededRes.getUser().getUid());
+    }
 }
