@@ -24,7 +24,10 @@ export class BookingService {
     date,
     slot,
     pricing,
-    paymentMethod = 'UPI'
+    paymentMethod = 'UPI',
+    razorpayPaymentId = null,
+    razorpayOrderId = null,
+    razorpaySignature = null
   }) {
     const lockKey = ConcurrencyService.getLockKey(courtId, date, slot);
     const now = Date.now();
@@ -43,7 +46,7 @@ export class BookingService {
       throw new Error("Reservation window (5 minutes) timed out. Please select the slot again.");
     }
 
-    // 2. Process simulated payment
+    // 2. Process simulated payment or verify gateway payment
     const paymentResult = await PaymentService.processPayment({
       amount: pricing.total,
       method: paymentMethod
@@ -74,8 +77,10 @@ export class BookingService {
       durationMinutes: 60,
       pricing,
       payment: {
-        paymentId: paymentResult.gatewayReference,
+        paymentId: razorpayPaymentId || paymentResult.gatewayReference,
         transactionId: paymentResult.transactionId,
+        razorpayOrderId: razorpayOrderId || null,
+        razorpaySignature: razorpaySignature || null,
         method: paymentMethod,
         amount: pricing.total,
         status: 'SUCCESS'

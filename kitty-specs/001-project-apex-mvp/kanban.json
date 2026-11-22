@@ -104,6 +104,30 @@
         "component": "PlayerPortal.js",
         "testSuite": "tests/runner.js (Suite 4 & 7)",
         "completedAt": "2026-11-17T20:51:00Z"
+      },
+      {
+        "id": "WP10",
+        "title": "Java Spring Boot 3.2.x REST Middleware & Cloud Firestore Integration",
+        "agent": "apex-backend",
+        "component": "backend/ (Spring Boot 3.2.3, Firebase Admin SDK)",
+        "testSuite": "backend:test (5 BackendApplicationTests)",
+        "completedAt": "2026-11-22T18:25:00Z"
+      },
+      {
+        "id": "WP11",
+        "title": "Razorpay Payment Gateway API & HMAC SHA-256 Verification",
+        "agent": "apex-backend",
+        "component": "backend/src/main/java/com/projectapex/service/RazorpayService.java",
+        "testSuite": "backend:test (Razorpay HMAC test)",
+        "completedAt": "2026-11-22T18:26:00Z"
+      },
+      {
+        "id": "WF07",
+        "title": "Java Middleware REST Integration & Razorpay Standard Checkout",
+        "agent": "apex-backend",
+        "component": "src/services/apiClient.js & CheckoutModal.js",
+        "testSuite": "tests/runner.js (Suite 9)",
+        "completedAt": "2026-11-22T18:28:00Z"
       }
     ],
     "review": [],

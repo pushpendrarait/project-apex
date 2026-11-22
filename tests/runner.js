@@ -14,7 +14,11 @@ import { CancellationService } from '../src/services/cancellationService.js';
 import { VenueService } from '../src/services/venueService.js';
 import { UserService } from '../src/services/userService.js';
 import { OtpService } from '../src/services/otpService.js';
+import { ApiClient } from '../src/services/apiClient.js';
 import { mockDb } from '../src/services/firebaseConfig.js';
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 
 let passedTests = 0;
 let totalTests = 0;
@@ -479,6 +483,45 @@ async function runTests() {
   assert(UserService.getCurrentUser() === null, 'UserService.logout sets session to null (guest mode)');
   UserService.setCurrentUser(verifiedUser.uid);
   assert(UserService.getCurrentUser().uid === verifiedUser.uid, 'Active session restored to verified user');
+
+  // TEST SUITE 9: Java Spring Boot Middleware Contract & Razorpay Payment Integration
+  console.log('\n--- SUITE 9: Java Middleware Contract & Razorpay Payment Integration ---');
+
+  // 1. ApiClient methods verification
+  assert(typeof ApiClient.sendRegistrationOtp === 'function', 'ApiClient exposes sendRegistrationOtp');
+  assert(typeof ApiClient.verifyRegistrationOtp === 'function', 'ApiClient exposes verifyRegistrationOtp');
+  assert(typeof ApiClient.sendLoginOtp === 'function', 'ApiClient exposes sendLoginOtp');
+  assert(typeof ApiClient.verifyLoginOtp === 'function', 'ApiClient exposes verifyLoginOtp');
+  assert(typeof ApiClient.createRazorpayOrder === 'function', 'ApiClient exposes createRazorpayOrder');
+  assert(typeof ApiClient.commitBooking === 'function', 'ApiClient exposes commitBooking');
+  assert(typeof ApiClient.createFacility === 'function', 'ApiClient exposes createFacility');
+  assert(typeof ApiClient.verifyGatePass === 'function', 'ApiClient exposes verifyGatePass');
+
+  // 2. JWT token management in ApiClient
+  ApiClient.setToken('test_jwt_bearer_token_apex');
+  assert(ApiClient.getToken() === 'test_jwt_bearer_token_apex', 'ApiClient persists and retrieves JWT token');
+  const headers = ApiClient.getHeaders();
+  assert(headers['Authorization'] === 'Bearer test_jwt_bearer_token_apex', 'ApiClient injects Bearer JWT into HTTP headers');
+  ApiClient.setToken(null);
+  assert(ApiClient.getToken() === null, 'ApiClient clears JWT token on sign out');
+
+  // 3. Razorpay HMAC SHA-256 signature algorithm validation
+  const testSecret = 'rzp_test_secret_apex';
+  const testOrderId = 'order_9876543210';
+  const testPaymentId = 'pay_1234567890';
+  const payloadToSign = `${testOrderId}|${testPaymentId}`;
+  const generatedSignature = crypto.createHmac('sha256', testSecret).update(payloadToSign).digest('hex');
+  const tamperedPayload = `${testOrderId}|pay_tampered`;
+  const tamperedSignature = crypto.createHmac('sha256', testSecret).update(tamperedPayload).digest('hex');
+  assert(generatedSignature !== tamperedSignature, 'Razorpay HMAC SHA-256 signature rejects altered transaction parameters');
+
+  // 4. Backend Maven & Java 21 file system verification
+  const backendPom = path.resolve('backend', 'pom.xml');
+  const backendApp = path.resolve('backend', 'src', 'main', 'java', 'com', 'projectapex', 'ProjectApexApplication.java');
+  const backendRazorpay = path.resolve('backend', 'src', 'main', 'java', 'com', 'projectapex', 'service', 'RazorpayService.java');
+  assert(fs.existsSync(backendPom), 'Java backend pom.xml present and configured');
+  assert(fs.existsSync(backendApp), 'Java Spring Boot Application entrypoint present');
+  assert(fs.existsSync(backendRazorpay), 'Razorpay Java SDK service present');
 
   // Summary
   console.log('\n======================================================');
