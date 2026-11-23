@@ -11,6 +11,7 @@
       "docs/**",
       "scripts/**",
       "backend/**",
+      "android/**",
       "tests/**"
     ],
     "rewrites": [
