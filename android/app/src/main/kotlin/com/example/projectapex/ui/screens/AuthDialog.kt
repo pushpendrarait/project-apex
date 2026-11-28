@@ -22,6 +22,7 @@ import com.example.projectapex.data.ApexRepository
 import com.example.projectapex.model.UserRole
 import com.example.projectapex.model.UserSession
 import com.example.projectapex.ui.theme.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun AuthDialog(
@@ -29,13 +30,18 @@ fun AuthDialog(
     repository: ApexRepository,
     onDismiss: () -> Unit
 ) {
+    val isBackendConnected by repository.isBackendConnected.collectAsState()
+    val scope = rememberCoroutineScope()
+
     var selectedTab by remember { mutableStateOf(0) } // 0: Login, 1: Sign Up
+    var isSubmitting by remember { mutableStateOf(false) }
 
     // Login state
     var isOtpLoginMode by remember { mutableStateOf(false) }
     var loginIdentifier by remember { mutableStateOf("") }
     var loginPassword by remember { mutableStateOf("") }
     var loginOtp by remember { mutableStateOf("") }
+    var loginOtpSessionId by remember { mutableStateOf<String?>(null) }
     var loginSimulatedOtpBanner by remember { mutableStateOf<String?>(null) }
     var loginError by remember { mutableStateOf<String?>(null) }
 
@@ -47,6 +53,7 @@ fun AuthDialog(
     var regPassword by remember { mutableStateOf("") }
     var regMobileOtp by remember { mutableStateOf("") }
     var regEmailOtp by remember { mutableStateOf("") }
+    var regOtpSessionId by remember { mutableStateOf<String?>(null) }
     var regSimulatedMobileOtp by remember { mutableStateOf<String?>(null) }
     var regSimulatedEmailOtp by remember { mutableStateOf<String?>(null) }
     var regError by remember { mutableStateOf<String?>(null) }
@@ -76,13 +83,20 @@ fun AuthDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = if (currentUser.isGuest) "ACCOUNT AUTHENTICATION" else "USER PROFILE",
-                        color = TextWhite,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
+                    Column {
+                        Text(
+                            text = if (currentUser.isGuest) "ACCOUNT AUTHENTICATION" else "USER PROFILE",
+                            color = TextWhite,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = if (isBackendConnected) "Synced with Render Java + Neon JWT" else "Offline Edge Session Mode",
+                            color = if (isBackendConnected) TurfEmerald else WarningAmber,
+                            fontSize = 11.sp
+                        )
+                    }
                     IconButton(onClick = onDismiss) {
                         Text("✕", color = TextSecondary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
@@ -107,12 +121,22 @@ fun AuthDialog(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(text = "Loyalty Points: ${currentUser.loyaltyPoints} APEX pts", color = WarningAmber, fontSize = 12.sp)
+                            if (!currentUser.jwtToken.isNullOrBlank()) {
+                                Text(
+                                    text = "JWT Session Active (Bearer Verified)",
+                                    color = AccentElectricBlue,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
 
                             Spacer(modifier = Modifier.height(10.dp))
                             Button(
                                 onClick = {
-                                    repository.logout()
-                                    onDismiss()
+                                    scope.launch {
+                                        repository.logoutWithBackend()
+                                        onDismiss()
+                                    }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
                                 modifier = Modifier.fillMaxWidth(),
@@ -222,9 +246,26 @@ fun AuthDialog(
                             )
                             Button(
                                 onClick = {
-                                    val simOtp = (100000..999999).random().toString()
-                                    loginOtp = simOtp
-                                    loginSimulatedOtpBanner = "Simulated OTP Sent: $simOtp"
+                                    if (loginIdentifier.isBlank()) {
+                                        loginError = "Enter mobile/email first"
+                                        return@Button
+                                    }
+                                    scope.launch {
+                                        val res = repository.sendLoginOtpWithBackend(loginIdentifier)
+                                        if (res.isSuccess) {
+                                            val dispatch = res.getOrThrow()
+                                            loginOtpSessionId = dispatch.sessionId
+                                            if (!dispatch.simulatedSmsOtp.isNullOrBlank()) {
+                                                loginOtp = dispatch.simulatedSmsOtp
+                                                loginSimulatedOtpBanner = "OTP Dispatched: ${dispatch.simulatedSmsOtp}"
+                                            } else {
+                                                loginSimulatedOtpBanner = "OTP Dispatched via Render API (Session ${dispatch.sessionId.take(10)})"
+                                            }
+                                            loginError = null
+                                        } else {
+                                            loginError = res.exceptionOrNull()?.message
+                                        }
+                                    }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = SurfaceElevated)
                             ) {
@@ -244,25 +285,34 @@ fun AuthDialog(
                     Button(
                         onClick = {
                             if (isOtpLoginMode) {
-                                val res = repository.loginWithOtp(loginIdentifier, loginOtp)
-                                if (res.isSuccess) onDismiss() else loginError = res.exceptionOrNull()?.message
+                                isSubmitting = true
+                                scope.launch {
+                                    val res = repository.verifyLoginOtpWithBackend(loginOtpSessionId, loginIdentifier, loginOtp)
+                                    isSubmitting = false
+                                    if (res.isSuccess) onDismiss() else loginError = res.exceptionOrNull()?.message
+                                }
                             } else {
                                 if (loginIdentifier.isBlank() || loginPassword.isBlank()) {
                                     loginError = "Please enter mobile/email and password"
                                 } else {
-                                    val res = repository.loginWithPassword(loginIdentifier, loginPassword)
-                                    if (res.isSuccess) onDismiss() else loginError = res.exceptionOrNull()?.message
+                                    isSubmitting = true
+                                    scope.launch {
+                                        val res = repository.authenticateWithBackend(loginIdentifier, loginPassword)
+                                        isSubmitting = false
+                                        if (res.isSuccess) onDismiss() else loginError = res.exceptionOrNull()?.message
+                                    }
                                 }
                             }
                         },
+                        enabled = !isSubmitting,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = BmsCrimson),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Log In", color = TextWhite, fontWeight = FontWeight.Bold)
+                        Text(if (isSubmitting) "Signing In..." else "Log In", color = TextWhite, fontWeight = FontWeight.Bold)
                     }
 
-                    // Demo Quick Fill Buttons
+                    // Demo Quick Fill Buttons synced with Backend Seed Users
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(text = "QUICK DEMO SIGN-IN", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     Row(
@@ -271,30 +321,38 @@ fun AuthDialog(
                     ) {
                         OutlinedButton(
                             onClick = {
-                                loginIdentifier = "pushpendra@projectapex.in"
+                                loginIdentifier = "rohan.deshmukh@apex.dev"
                                 loginPassword = "password123"
                                 isOtpLoginMode = false
-                                repository.loginWithPassword("pushpendra@projectapex.in", "password123")
-                                onDismiss()
+                                isSubmitting = true
+                                scope.launch {
+                                    repository.authenticateWithBackend("rohan.deshmukh@apex.dev", "password123")
+                                    isSubmitting = false
+                                    onDismiss()
+                                }
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("⚡ Pushpendra (Player)", fontSize = 10.sp)
+                            Text("⚡ Rohan (Player)", fontSize = 10.sp)
                         }
 
                         OutlinedButton(
                             onClick = {
-                                loginIdentifier = "owner@projectapex.in"
+                                loginIdentifier = "santosh@apexarena.com"
                                 loginPassword = "password123"
                                 isOtpLoginMode = false
-                                repository.loginWithPassword("owner@projectapex.in", "password123")
-                                onDismiss()
+                                isSubmitting = true
+                                scope.launch {
+                                    repository.authenticateWithBackend("santosh@apexarena.com", "password123")
+                                    isSubmitting = false
+                                    onDismiss()
+                                }
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("🏟️ Arena Owner", fontSize = 10.sp)
+                            Text("🏟️ Santosh (Owner)", fontSize = 10.sp)
                         }
                     }
                 }
@@ -384,9 +442,20 @@ fun AuthDialog(
                         )
                         Button(
                             onClick = {
-                                val sim = (100000..999999).random().toString()
-                                regMobileOtp = sim
-                                regSimulatedMobileOtp = "Mobile OTP: $sim"
+                                scope.launch {
+                                    val res = repository.sendRegistrationOtpWithBackend(regPhone, regEmail, regName.ifBlank { "Apex Player" })
+                                    if (res.isSuccess) {
+                                        val dispatch = res.getOrThrow()
+                                        regOtpSessionId = dispatch.sessionId
+                                        val sms = dispatch.simulatedSmsOtp ?: (100000..999999).random().toString()
+                                        regMobileOtp = sms
+                                        regSimulatedMobileOtp = "Mobile OTP: $sms"
+                                        if (!dispatch.simulatedEmailOtp.isNullOrBlank()) {
+                                            regEmailOtp = dispatch.simulatedEmailOtp
+                                            regSimulatedEmailOtp = "Email OTP: ${dispatch.simulatedEmailOtp}"
+                                        }
+                                    }
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = SurfaceElevated)
                         ) {
@@ -431,26 +500,36 @@ fun AuthDialog(
 
                     Button(
                         onClick = {
-                            val res = repository.registerUser(
-                                name = regName,
-                                email = regEmail,
-                                phone = regPhone,
-                                pass = regPassword,
-                                role = regRole,
-                                mobileOtp = regMobileOtp,
-                                emailOtp = regEmailOtp
-                            )
-                            if (res.isSuccess) {
-                                onDismiss()
-                            } else {
-                                regError = res.exceptionOrNull()?.message
+                            isSubmitting = true
+                            scope.launch {
+                                val res = repository.registerUserWithBackend(
+                                    name = regName,
+                                    email = regEmail,
+                                    phone = regPhone,
+                                    pass = regPassword,
+                                    role = regRole,
+                                    mobileOtp = regMobileOtp,
+                                    emailOtp = regEmailOtp,
+                                    sessionId = regOtpSessionId
+                                )
+                                isSubmitting = false
+                                if (res.isSuccess) {
+                                    onDismiss()
+                                } else {
+                                    regError = res.exceptionOrNull()?.message
+                                }
                             }
                         },
+                        enabled = !isSubmitting,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = TurfEmerald),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Verify OTPs & Register Account", color = BgMidnight, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = if (isSubmitting) "Registering..." else "Verify OTPs & Register Account",
+                            color = BgMidnight,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

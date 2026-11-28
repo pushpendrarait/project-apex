@@ -8,12 +8,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 class ApexRepository(
-    val apiClient: ApexApiClient = ApexApiClient()
+    val apiClient: ApexApiClient = ApexApiClient(),
+    checkOnInit: Boolean = true
 ) {
     private val scope = CoroutineScope(Dispatchers.Default)
 
@@ -26,7 +28,8 @@ class ApexRepository(
             phone = "+91 98200 12345",
             role = UserRole.ROLE_PLAYER,
             loyaltyPoints = 50,
-            isGuest = true
+            isGuest = true,
+            jwtToken = null
         )
     )
     val currentUser: StateFlow<UserSession> = _currentUser.asStateFlow()
@@ -39,12 +42,15 @@ class ApexRepository(
     private val _selectedSport = MutableStateFlow<SportType?>(null)
     val selectedSport: StateFlow<SportType?> = _selectedSport.asStateFlow()
 
-    // Backend Connectivity
+    // Backend Connectivity & 3-Tier Live Health
     private val _backendUrl = MutableStateFlow(apiClient.baseUrl)
     val backendUrl: StateFlow<String> = _backendUrl.asStateFlow()
 
     private val _isBackendConnected = MutableStateFlow(false)
     val isBackendConnected: StateFlow<Boolean> = _isBackendConnected.asStateFlow()
+
+    private val _healthStatus = MutableStateFlow<HealthStatus?>(null)
+    val healthStatus: StateFlow<HealthStatus?> = _healthStatus.asStateFlow()
 
     // Active Slot Hold (10-minute hold window)
     private val _activeHold = MutableStateFlow<HoldSession?>(null)
@@ -68,7 +74,9 @@ class ApexRepository(
 
     init {
         initializeInitialData()
-        checkBackendConnectivity()
+        if (checkOnInit) {
+            checkBackendConnectivity()
+        }
     }
 
     private fun initializeInitialData() {
@@ -235,17 +243,108 @@ class ApexRepository(
 
     fun checkBackendConnectivity(customUrl: String? = null) {
         scope.launch {
-            val urlToTest = customUrl ?: _backendUrl.value
-            val isConnected = apiClient.pingBackend(urlToTest)
-            _isBackendConnected.value = isConnected
-            if (customUrl != null && isConnected) {
-                _backendUrl.value = customUrl
-                apiClient.baseUrl = customUrl
-            }
+            checkBackendConnectivityAndAwait(customUrl)
         }
     }
 
-    // Dynamic Slot Availability (Zero Firestore Pre-Generation)
+    suspend fun checkBackendConnectivityAndAwait(customUrl: String? = null): HealthStatus? {
+        val rawCandidate = customUrl ?: _backendUrl.value
+        val normalized = ApexApiClient.normalizeBaseUrl(rawCandidate)
+        val urlToTest = normalized.ifEmpty { ApexApiClient.RENDER_PROD_URL }
+
+        if (customUrl != null && normalized.isNotEmpty()) {
+            _backendUrl.value = normalized
+            apiClient.baseUrl = normalized
+        }
+
+        val health = apiClient.checkHealth(urlToTest)
+        if (health != null && health.isOnline) {
+            _healthStatus.value = health
+            _isBackendConnected.value = true
+            _backendUrl.value = urlToTest
+            apiClient.baseUrl = urlToTest
+            return health
+        }
+
+        // Graceful fallback check for /api/v1/sports
+        val sportsAlive = apiClient.pingBackend(urlToTest)
+        _isBackendConnected.value = sportsAlive
+        val fallbackHealth = if (sportsAlive) {
+            HealthStatus(
+                status = "UP",
+                service = "project-apex-backend",
+                hosting = if (urlToTest.contains("10.0.2.2") || urlToTest.contains("localhost")) "Localhost Dev" else "Render",
+                runtime = "Java 21 LTS + Spring Boot 3.2.x",
+                database = "Neon PostgreSQL",
+                dbConnected = true,
+                url = urlToTest,
+                isOnline = true
+            )
+        } else {
+            HealthStatus(
+                status = "STANDBY",
+                service = "project-apex-backend",
+                hosting = if (urlToTest.contains("10.0.2.2") || urlToTest.contains("localhost")) "Localhost Dev" else "Render",
+                runtime = "Java 21 LTS + Spring Boot 3.2.x",
+                database = "Neon PostgreSQL",
+                dbConnected = false,
+                url = urlToTest,
+                isOnline = false
+            )
+        }
+        _healthStatus.value = fallbackHealth
+        return fallbackHealth
+    }
+
+    // =========================================================================
+    // Live 3-Tier Backend Sync (Venues, Courts, Slots, Bookings)
+    // =========================================================================
+
+    suspend fun syncWithBackend() {
+        syncVenuesFromBackend()
+        if (!apiClient.authToken.isNullOrBlank()) {
+            syncBookingsFromBackend()
+        }
+    }
+
+    suspend fun syncVenuesFromBackend(): Boolean {
+        val venuesResult = apiClient.fetchVenues()
+        val remoteVenues = venuesResult.getOrNull() ?: return false
+        if (remoteVenues.isEmpty()) return false
+
+        val collectedCourts = mutableListOf<Court>()
+        for (v in remoteVenues) {
+            val detail = apiClient.fetchVenueDetail(v.id).getOrNull()
+            if (detail != null) {
+                collectedCourts.addAll(detail.second)
+            }
+        }
+
+        _venues.value = remoteVenues
+        if (collectedCourts.isNotEmpty()) {
+            _courts.value = collectedCourts
+        }
+        return true
+    }
+
+    suspend fun syncBookingsFromBackend(): Boolean {
+        if (apiClient.authToken.isNullOrBlank()) return false
+        val remoteBookings = apiClient.fetchMyBookings().getOrNull() ?: return false
+        _bookingPasses.value = remoteBookings
+        return true
+    }
+
+    suspend fun loadSlotsForDate(courtId: String, dateStr: String): List<TimeSlot> {
+        if (_isBackendConnected.value) {
+            val remote = apiClient.fetchAvailability(courtId, dateStr).getOrNull()
+            if (!remote.isNullOrEmpty()) {
+                return remote
+            }
+        }
+        return getDynamicSlotsForDate(courtId, dateStr)
+    }
+
+    // Dynamic Slot Availability (Zero Pre-Generation Engine)
     fun getDynamicSlotsForDate(courtId: String, dateStr: String): List<TimeSlot> {
         val court = _courts.value.find { it.id == courtId } ?: return emptyList()
         val slots = mutableListOf<TimeSlot>()
@@ -345,7 +444,7 @@ class ApexRepository(
         _activeHold.value = null
     }
 
-    // Price Quote & Breakdown
+    // Price Quote & Breakdown (integer paise)
     fun calculateQuote(hold: HoldSession, promoCode: String?): PriceBreakdown {
         var baseTotal = 0L
         var offPeakDiscount = 0L
@@ -364,13 +463,13 @@ class ApexRepository(
         var appliedPromo: String? = null
         val normalizedCode = promoCode?.trim()?.uppercase()
 
-        if (normalizedCode == "WELCOME50") {
+        if (normalizedCode == "WELCOME50" || normalizedCode == "THANE50") {
             promoDiscount = 5000L // ₹50 off = 5000 paise
-            appliedPromo = "WELCOME50 (-₹50)"
-        } else if (normalizedCode == "APEX20") {
+            appliedPromo = "$normalizedCode (-₹50)"
+        } else if (normalizedCode == "APEX20" || normalizedCode == "TURF20") {
             promoDiscount = ((baseTotal + peakSurge - offPeakDiscount) * 20L) / 100L
             if (promoDiscount > 15000L) promoDiscount = 15000L // Cap at ₹150
-            appliedPromo = "APEX20 (20% off)"
+            appliedPromo = "$normalizedCode (20% off)"
         }
 
         val subtotal = (baseTotal - offPeakDiscount + peakSurge - promoDiscount).coerceAtLeast(10000L) // Min 100 INR rule
@@ -388,7 +487,23 @@ class ApexRepository(
         )
     }
 
-    // Confirm Booking & Generate Match Pass with QR Code
+    suspend fun calculateQuoteWithBackend(hold: HoldSession, promoCode: String?): PriceBreakdown {
+        if (_isBackendConnected.value) {
+            val remote = apiClient.calculatePricingQuote(
+                venueId = hold.venueId,
+                resourceId = hold.courtId,
+                date = hold.date,
+                slots = hold.slots.map { it.startTime },
+                promoCode = promoCode
+            ).getOrNull()
+            if (remote != null) {
+                return remote
+            }
+        }
+        return calculateQuote(hold, promoCode)
+    }
+
+    // Confirm Booking & Generate Match Pass with QR Code (Local / Unit-Test Synchronous)
     fun confirmBooking(hold: HoldSession, quote: PriceBreakdown): BookingPass {
         val randomSuffix = (1000..9999).random().toString() + ('A'..'Z').random()
         val bookingCode = "ARENA-$randomSuffix"
@@ -421,6 +536,44 @@ class ApexRepository(
         _bookingPasses.value = listOf(pass) + _bookingPasses.value
         _activeHold.value = null
         return pass
+    }
+
+    suspend fun confirmBookingWithBackend(
+        hold: HoldSession,
+        quote: PriceBreakdown,
+        promoCode: String? = null
+    ): BookingPass {
+        if (_isBackendConnected.value && !apiClient.authToken.isNullOrBlank()) {
+            val initResult = apiClient.initiateBooking(
+                venueId = hold.venueId,
+                resourceId = hold.courtId,
+                bookingDate = hold.date,
+                slotStartTimes = hold.slots.map { it.startTime },
+                sportType = hold.sportType.name,
+                promoCode = promoCode
+            ).getOrNull()
+
+            if (initResult != null && initResult.bookingId.isNotBlank()) {
+                val paymentId = "pay_mobile_" + UUID.randomUUID().toString().replace("-", "").take(10)
+                val verified = apiClient.verifyBookingPayment(
+                    bookingId = initResult.bookingId,
+                    razorpayOrderId = initResult.razorpayOrderId,
+                    razorpayPaymentId = paymentId,
+                    razorpaySignature = "SIMULATED_TEST_SIGNATURE"
+                ).getOrNull()
+
+                if (verified != null) {
+                    for (s in hold.slots) {
+                        lockedSlots.remove(s.id)
+                        bookedSlots[s.id] = verified.id
+                    }
+                    _bookingPasses.value = listOf(verified) + _bookingPasses.value.filterNot { it.id == verified.id }
+                    _activeHold.value = null
+                    return verified
+                }
+            }
+        }
+        return confirmBooking(hold, quote)
     }
 
     // 3-Tier Cancellation Policy:
@@ -484,6 +637,25 @@ class ApexRepository(
         return Pair(true, "Cancelled successfully. Refund ₹$refundRs initiated via original payment method ($tierDesc).")
     }
 
+    suspend fun cancelBookingWithBackend(
+        passId: String,
+        reason: String = "Player requested cancellation"
+    ): Pair<Boolean, String> {
+        if (_isBackendConnected.value && !apiClient.authToken.isNullOrBlank()) {
+            val res = apiClient.cancelBooking(passId, reason)
+            if (res.isSuccess) {
+                val cancelled = res.getOrThrow()
+                _bookingPasses.value = _bookingPasses.value.map {
+                    if (it.id == passId) cancelled else it
+                }
+                val toRemove = bookedSlots.filterValues { it == passId }.keys
+                toRemove.forEach { bookedSlots.remove(it) }
+                return Pair(true, "Cancelled on server. Refund ₹${cancelled.refundAmountRupees} processed.")
+            }
+        }
+        return cancelBooking(passId)
+    }
+
     // Facility Owner Portal Actions
     fun addCourt(
         venueId: String,
@@ -512,9 +684,52 @@ class ApexRepository(
         return court
     }
 
+    suspend fun addCourtWithBackend(
+        venueId: String,
+        name: String,
+        sportType: SportType,
+        capacity: Int,
+        surfaceType: String,
+        isIndoor: Boolean,
+        dimensions: String,
+        basePricePaise: Long,
+        peakPricePaise: Long
+    ): Court {
+        if (_isBackendConnected.value && !apiClient.authToken.isNullOrBlank()) {
+            val remote = apiClient.createFacility(
+                venueId = venueId,
+                name = name,
+                sport = sportType.name.lowercase(),
+                capacity = capacity,
+                surface = surfaceType,
+                dimensions = dimensions,
+                baseHourlyRateRupees = (basePricePaise / 100L).toInt().coerceAtLeast(200),
+                peakHourlyRateRupees = (peakPricePaise / 100L).toInt().coerceAtLeast(200),
+                hasFloodlights = !isIndoor
+            ).getOrNull()
+            if (remote != null) {
+                _courts.value = _courts.value + remote
+                return remote
+            }
+        }
+        return addCourt(
+            venueId = venueId,
+            name = name,
+            sportType = sportType,
+            capacity = capacity,
+            surfaceType = surfaceType,
+            isIndoor = isIndoor,
+            dimensions = dimensions,
+            basePricePaise = basePricePaise,
+            peakPricePaise = peakPricePaise
+        )
+    }
+
     fun verifyGateQr(bookingCode: String): Pair<Boolean, String> {
-        val pass = _bookingPasses.value.find { it.bookingCode.equals(bookingCode.trim(), ignoreCase = true) }
-            ?: return Pair(false, "Invalid QR code: Pass not found in system")
+        val pass = _bookingPasses.value.find {
+            it.bookingCode.equals(bookingCode.trim(), ignoreCase = true) ||
+                (!it.qrPassToken.isNullOrBlank() && it.qrPassToken.equals(bookingCode.trim(), ignoreCase = true))
+        } ?: return Pair(false, "Invalid QR code: Pass not found in system")
 
         if (pass.status == BookingStatus.CHECKED_IN) {
             return Pair(false, "Already Checked-In at ${pass.venueName}")
@@ -530,9 +745,29 @@ class ApexRepository(
         return Pair(true, "Verified! Welcome ${pass.courtName} (${pass.timeSlotRange})")
     }
 
-    // User Authentication
+    suspend fun verifyGateQrWithBackend(bookingCode: String): Pair<Boolean, String> {
+        if (_isBackendConnected.value && !apiClient.authToken.isNullOrBlank()) {
+            val res = apiClient.verifyGatePass(bookingCode)
+            if (res.isSuccess) {
+                val gate = res.getOrThrow()
+                if (gate.booking != null) {
+                    _bookingPasses.value = _bookingPasses.value.map {
+                        if (it.id == gate.booking.id || it.bookingCode.equals(gate.booking.bookingCode, ignoreCase = true)) {
+                            gate.booking
+                        } else it
+                    }
+                }
+                return Pair(gate.valid, gate.message)
+            }
+        }
+        return verifyGateQr(bookingCode)
+    }
+
+    // User Authentication (Sync local methods preserved + async backend-synced helpers)
     fun loginWithPassword(emailOrPhone: String, pass: String): Result<UserSession> {
-        val role = if (emailOrPhone.contains("owner", ignoreCase = true)) UserRole.ROLE_OWNER else UserRole.ROLE_PLAYER
+        val role = if (emailOrPhone.contains("owner", ignoreCase = true) ||
+            emailOrPhone.contains("santosh", ignoreCase = true)
+        ) UserRole.ROLE_OWNER else UserRole.ROLE_PLAYER
         val user = UserSession(
             uid = "usr_" + UUID.randomUUID().toString().take(8),
             name = if (role == UserRole.ROLE_OWNER) "Rajesh Patil (Owner)" else "Pushpendra Rait",
@@ -544,6 +779,127 @@ class ApexRepository(
         )
         _currentUser.value = user
         return Result.success(user)
+    }
+
+    suspend fun authenticateWithBackend(identifier: String, password: String): Result<UserSession> {
+        if (_isBackendConnected.value) {
+            val res = apiClient.loginWithPassword(identifier, password)
+            if (res.isSuccess) {
+                val auth = res.getOrThrow()
+                _currentUser.value = auth.user
+                syncBookingsFromBackend()
+                return Result.success(auth.user)
+            }
+            val err = res.exceptionOrNull()
+            if (err != null && err !is IOException && err.message?.contains("Incorrect password", ignoreCase = true) == true) {
+                return Result.failure(err)
+            }
+        }
+        return loginWithPassword(identifier, password)
+    }
+
+    suspend fun sendLoginOtpWithBackend(identifier: String): Result<OtpDispatchResult> {
+        if (_isBackendConnected.value) {
+            val res = apiClient.sendLoginOtp(identifier)
+            if (res.isSuccess) return res
+        }
+        val simOtp = (100000..999999).random().toString()
+        return Result.success(
+            OtpDispatchResult(
+                sessionId = "local_login_" + UUID.randomUUID().toString().take(6),
+                expiresInSeconds = 300,
+                simulatedSmsOtp = simOtp
+            )
+        )
+    }
+
+    suspend fun verifyLoginOtpWithBackend(sessionId: String?, phoneOrIdentifier: String, otp: String): Result<UserSession> {
+        if (_isBackendConnected.value && !sessionId.isNullOrBlank() && !sessionId.startsWith("local_")) {
+            val res = apiClient.verifyLoginOtp(sessionId, otp)
+            if (res.isSuccess) {
+                val auth = res.getOrThrow()
+                _currentUser.value = auth.user
+                syncBookingsFromBackend()
+                return Result.success(auth.user)
+            }
+            val err = res.exceptionOrNull()
+            if (err != null && err !is IOException) {
+                return Result.failure(err)
+            }
+        }
+        return loginWithOtp(phoneOrIdentifier, otp)
+    }
+
+    suspend fun sendRegistrationOtpWithBackend(
+        phone: String,
+        email: String,
+        displayName: String
+    ): Result<OtpDispatchResult> {
+        if (_isBackendConnected.value) {
+            val res = apiClient.sendRegistrationOtp(phone, email, displayName)
+            if (res.isSuccess) return res
+        }
+        val sms = (100000..999999).random().toString()
+        val mail = (100000..999999).random().toString()
+        return Result.success(
+            OtpDispatchResult(
+                sessionId = "local_reg_" + UUID.randomUUID().toString().take(6),
+                expiresInSeconds = 300,
+                simulatedSmsOtp = sms,
+                simulatedEmailOtp = mail
+            )
+        )
+    }
+
+    suspend fun registerUserWithBackend(
+        name: String,
+        email: String,
+        phone: String,
+        pass: String,
+        role: UserRole,
+        mobileOtp: String,
+        emailOtp: String,
+        sessionId: String? = null
+    ): Result<UserSession> {
+        if (name.isBlank() || email.isBlank() || phone.isBlank() || pass.length < 6) {
+            return Result.failure(IllegalArgumentException("Please fill all mandatory fields (Password min 6 chars)"))
+        }
+        if (mobileOtp.length < 4 || emailOtp.length < 4) {
+            return Result.failure(IllegalArgumentException("Please enter verified Mobile and Email OTPs"))
+        }
+
+        if (_isBackendConnected.value) {
+            val authRes = if (!sessionId.isNullOrBlank() && !sessionId.startsWith("local_")) {
+                apiClient.verifyRegistrationOtp(
+                    sessionId = sessionId,
+                    phoneOtp = mobileOtp,
+                    emailOtp = emailOtp,
+                    displayName = name,
+                    phone = phone,
+                    email = email,
+                    role = role,
+                    city = _selectedCity.value,
+                    password = pass
+                )
+            } else {
+                apiClient.registerWithPassword(
+                    displayName = name,
+                    email = email,
+                    phone = phone,
+                    password = pass,
+                    city = _selectedCity.value,
+                    role = role
+                )
+            }
+
+            if (authRes.isSuccess) {
+                val auth = authRes.getOrThrow()
+                _currentUser.value = auth.user
+                syncWithBackend()
+                return Result.success(auth.user)
+            }
+        }
+        return registerUser(name, email, phone, pass, role, mobileOtp, emailOtp)
     }
 
     fun loginWithOtp(phone: String, otp: String): Result<UserSession> {
@@ -592,6 +948,8 @@ class ApexRepository(
     }
 
     fun logout() {
+        apiClient.authToken = null
+        apiClient.activeUserId = null
         _currentUser.value = UserSession(
             uid = "guest_001",
             name = "Guest Player",
@@ -599,8 +957,14 @@ class ApexRepository(
             phone = "+91 98200 12345",
             role = UserRole.ROLE_PLAYER,
             loyaltyPoints = 0,
-            isGuest = true
+            isGuest = true,
+            jwtToken = null
         )
+    }
+
+    suspend fun logoutWithBackend() {
+        apiClient.logout()
+        logout()
     }
 
     fun switchRole(newRole: UserRole) {

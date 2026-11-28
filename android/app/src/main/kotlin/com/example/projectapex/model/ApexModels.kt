@@ -14,7 +14,28 @@ enum class SportType(
     POOL_TABLE("Pool & Snooker", "English 8-ball & professional tournament slate", "🎱"),
     LAWN_TENNIS("Lawn Tennis", "DecoTurf hard courts with night lighting", "🎾"),
     SQUASH("Squash", "Glass-back air-conditioned squash arena", "💥"),
-    MULTI_SPORT("Multi-Sport", "Versatile court for Basketball, Futsal & Volleyball", "🏟️")
+    MULTI_SPORT("Multi-Sport", "Versatile court for Basketball, Futsal & Volleyball", "🏟️");
+
+    companion object {
+        fun fromApiName(raw: String?): SportType {
+            val cleaned = raw?.trim()?.uppercase() ?: return MULTI_SPORT
+            entries.firstOrNull {
+                it.name.equals(cleaned, ignoreCase = true) ||
+                    it.displayName.equals(cleaned, ignoreCase = true)
+            }?.let { return it }
+
+            return when {
+                cleaned.contains("CRICKET") -> CRICKET_TURF
+                cleaned.contains("FOOTBALL") || cleaned.contains("SOCCER") -> FOOTBALL_TURF
+                cleaned.contains("BADMINTON") -> BADMINTON
+                cleaned.contains("PICKLE") -> PICKLEBALL
+                cleaned.contains("POOL") || cleaned.contains("SNOOKER") -> POOL_TABLE
+                cleaned.contains("TENNIS") -> LAWN_TENNIS
+                cleaned.contains("SQUASH") -> SQUASH
+                else -> MULTI_SPORT
+            }
+        }
+    }
 }
 
 data class Venue(
@@ -127,7 +148,8 @@ data class BookingPass(
     val status: BookingStatus = BookingStatus.CONFIRMED,
     val createdAtMs: Long = System.currentTimeMillis(),
     val refundAmountPaise: Long = 0,
-    val cancellationTier: String? = null
+    val cancellationTier: String? = null,
+    val qrPassToken: String? = null
 ) : Serializable {
     val amountPaidRupees: Long get() = amountPaidPaise / 100
     val refundAmountRupees: Long get() = refundAmountPaise / 100
@@ -145,5 +167,52 @@ data class UserSession(
     val phone: String,
     val role: UserRole = UserRole.ROLE_PLAYER,
     val loyaltyPoints: Int = 120,
-    val isGuest: Boolean = false
+    val isGuest: Boolean = false,
+    val jwtToken: String? = null
+) : Serializable
+
+data class HealthStatus(
+    val status: String = "STANDBY",
+    val service: String = "project-apex-backend",
+    val hosting: String = "Render",
+    val runtime: String = "Java 21 LTS + Spring Boot 3.2.x",
+    val database: String = "Neon PostgreSQL",
+    val dbConnected: Boolean = false,
+    val usersCount: Long = 0L,
+    val venuesCount: Long = 0L,
+    val bookingsCount: Long = 0L,
+    val latencyMs: Long = 0L,
+    val url: String = "",
+    val isOnline: Boolean = false,
+    val message: String? = null,
+    val timestampMs: Long = System.currentTimeMillis()
+) : Serializable
+
+data class AuthResult(
+    val token: String,
+    val user: UserSession
+) : Serializable
+
+data class OtpDispatchResult(
+    val sessionId: String,
+    val expiresInSeconds: Int = 300,
+    val simulatedSmsOtp: String? = null,
+    val simulatedEmailOtp: String? = null
+) : Serializable
+
+data class BookingInitiationResult(
+    val bookingId: String,
+    val razorpayOrderId: String,
+    val amountPaise: Long,
+    val currency: String = "INR",
+    val razorpayKeyId: String? = null,
+    val holdExpiresAtMs: Long,
+    val quote: PriceBreakdown? = null
+) : Serializable
+
+data class GateVerifyResult(
+    val valid: Boolean,
+    val alreadyCheckedIn: Boolean = false,
+    val message: String,
+    val booking: BookingPass? = null
 ) : Serializable

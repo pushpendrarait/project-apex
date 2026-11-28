@@ -50,9 +50,9 @@ public class BookingController {
     }
 
     /**
-     * GET /api/v1/bookings/my - Player's bookings
+     * GET /api/v1/bookings/my or /api/v1/bookings/my-passes - Player's bookings
      */
-    @GetMapping("/bookings/my")
+    @GetMapping({"/bookings/my", "/bookings/my-passes"})
     public ResponseEntity<ApiResponse<List<BookingRecord>>> getMyBookings(Authentication auth) {
         String userId = auth != null ? auth.getName() : "demo_player";
         List<BookingRecord> bookings = bookingService.getPlayerBookings(userId);

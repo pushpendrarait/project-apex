@@ -1,7 +1,6 @@
 package com.example.projectapex.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -10,7 +9,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,11 +33,23 @@ fun MainAppContainer(
     val selectedCity by repository.selectedCity.collectAsState()
     val selectedSport by repository.selectedSport.collectAsState()
     val isBackendConnected by repository.isBackendConnected.collectAsState()
+    val healthStatus by repository.healthStatus.collectAsState()
     val venues by repository.venues.collectAsState()
     val passes by repository.bookingPasses.collectAsState()
 
+    // Sync shared Render + Neon venues/courts whenever backend becomes reachable
+    LaunchedEffect(isBackendConnected) {
+        if (isBackendConnected) {
+            repository.syncWithBackend()
+        }
+    }
+
     val cityVenues = remember(venues, selectedCity) {
-        venues.filter { it.city.equals(selectedCity, ignoreCase = true) }
+        if (selectedCity.equals("All Cities", ignoreCase = true)) {
+            venues
+        } else {
+            venues.filter { it.city.equals(selectedCity, ignoreCase = true) }
+        }
     }
 
     Scaffold(
@@ -50,6 +60,7 @@ fun MainAppContainer(
                     selectedCity = selectedCity,
                     currentUser = currentUser,
                     isBackendConnected = isBackendConnected,
+                    healthStatus = healthStatus,
                     onCityClick = { showCityDialog = true },
                     onAuthClick = { showAuthDialog = true },
                     onBackendClick = { showBackendDialog = true },
@@ -139,7 +150,7 @@ fun MainAppContainer(
             hold = activeCheckoutHold!!,
             repository = repository,
             onDismiss = { activeCheckoutHold = null },
-            onBookingComplete = { pass ->
+            onBookingComplete = {
                 activeCheckoutHold = null
                 activeVenueDetail = null
                 selectedTab = 1 // Navigate to Passes tab

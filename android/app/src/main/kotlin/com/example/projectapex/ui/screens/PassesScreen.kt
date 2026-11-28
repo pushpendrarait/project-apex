@@ -20,6 +20,7 @@ import com.example.projectapex.model.BookingPass
 import com.example.projectapex.model.BookingStatus
 import com.example.projectapex.ui.components.QrCodeView
 import com.example.projectapex.ui.theme.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun PassesScreen(
@@ -27,8 +28,13 @@ fun PassesScreen(
     modifier: Modifier = Modifier
 ) {
     val passes by repository.bookingPasses.collectAsState()
+    val scope = rememberCoroutineScope()
     var selectedPassForCancel by remember { mutableStateOf<BookingPass?>(null) }
     var cancelResultMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        repository.syncBookingsFromBackend()
+    }
 
     LazyColumn(
         modifier = modifier
@@ -134,9 +140,12 @@ fun PassesScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val result = repository.cancelBooking(pass.id)
+                        val targetId = pass.id
                         selectedPassForCancel = null
-                        cancelResultMessage = result.second
+                        scope.launch {
+                            val result = repository.cancelBookingWithBackend(targetId)
+                            cancelResultMessage = result.second
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
                 ) {

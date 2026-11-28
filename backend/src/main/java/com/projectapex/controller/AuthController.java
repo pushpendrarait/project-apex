@@ -60,7 +60,7 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok("Account created successfully", response));
     }
 
-    @PostMapping("/auth/registration/send-otp")
+    @PostMapping({"/auth/registration/send-otp", "/auth/register/send-otp"})
     public ResponseEntity<ApiResponse<Map<String, Object>>> sendRegistrationOtp(@Valid @RequestBody SendRegistrationOtpRequest req) {
         var session = otpService.sendRegistrationOtp(req.getPhone(), req.getEmail());
         return ResponseEntity.ok(ApiResponse.ok("Verification OTPs dispatched", Map.of(
@@ -69,7 +69,7 @@ public class AuthController {
         )));
     }
 
-    @PostMapping("/auth/registration/verify-otp")
+    @PostMapping({"/auth/registration/verify-otp", "/auth/register/verify-otp"})
     public ResponseEntity<ApiResponse<AuthResponse>> verifyRegistrationOtp(@Valid @RequestBody VerifyRegistrationOtpRequest req) {
         AuthResponse response = authService.verifyAndRegister(req);
         return ResponseEntity.ok(ApiResponse.ok("Registration verified successfully", response));
@@ -88,5 +88,13 @@ public class AuthController {
     public ResponseEntity<ApiResponse<AuthResponse>> verifyLoginOtp(@Valid @RequestBody VerifyLoginOtpRequest req) {
         AuthResponse response = authService.verifyLoginOtp(req.getSessionId(), req.getOtp());
         return ResponseEntity.ok(ApiResponse.ok("Login successful", response));
+    }
+
+    /**
+     * Stateless JWT logout acknowledgement for Web, Android, and iOS clients.
+     */
+    @PostMapping("/auth/logout")
+    public ResponseEntity<ApiResponse<Void>> logout() {
+        return ResponseEntity.ok(ApiResponse.ok("Logged out successfully", null));
     }
 }

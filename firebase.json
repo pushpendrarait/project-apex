@@ -13,6 +13,7 @@
       "backend/**",
       "render.yaml",
       "android/**",
+      "ios/**",
       "tests/**"
     ],
     "rewrites": [

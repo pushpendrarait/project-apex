@@ -4,8 +4,8 @@
   "governance": "Spec Kitty Spec-Driven Development",
   "hierarchy": {
     "rootCoordinator": "apex-pm",
-    "totalAgents": 6,
-    "pattern": "apex-pm -> [apex-ba, apex-tech-lead -> [apex-ui, apex-java, apex-db]]"
+    "totalAgents": 8,
+    "pattern": "apex-pm -> [apex-ba, apex-tech-lead -> [apex-ui, apex-java, apex-db, apex-deploy, apex-mobile]]"
   },
   "architecture": {
     "model": "3-Tier Multi-Cloud Architecture",
@@ -84,14 +84,22 @@
       "role": "Top Coordinator — Orchestration, Governance & 3-Tier Delivery",
       "tier": "Governance",
       "reportsTo": null,
-      "directReports": ["apex-ba", "apex-tech-lead"],
+      "directReports": [
+        "apex-ba",
+        "apex-tech-lead"
+      ],
       "duties": [
         "Enforce Spec Kitty SDD lifecycle (specify -> plan -> tasks -> implement)",
         "Coordinate deliverables across Business Analyst (apex-ba) and Technical Lead (apex-tech-lead)",
         "Maintain kanban work package lanes (backlog, doing, review, done) and milestone status reports",
         "Audit compliance against Zero Cloud Functions, Spark Tier quotas, and 3-tier Firebase/Render/Neon mandates"
       ],
-      "artifacts": ["spec.md", "plan.md", "tasks.md", "kanban.json"]
+      "artifacts": [
+        "spec.md",
+        "plan.md",
+        "tasks.md",
+        "kanban.json"
+      ]
     },
     "apex-ba": {
       "name": "Business Analyst",
@@ -106,7 +114,11 @@
         "Define and enforce BA-01 through BA-08 business rules (Dual OTP KYC, Owner Onboarding, Dynamic Pricing, 10-min ACID Hold, Razorpay Webhooks, 3-Tier Cancellation, Gate QR, Cloud SLA)",
         "Specify Given-When-Then acceptance criteria and traceability matrices"
       ],
-      "artifacts": ["docs/brd.md", "docs/prd.md", "spec.md"]
+      "artifacts": [
+        "docs/brd.md",
+        "docs/prd.md",
+        "spec.md"
+      ]
     },
     "apex-tech-lead": {
       "name": "Technical Lead",
@@ -114,12 +126,18 @@
       "role": "3-Tier Architecture, API Contracts & Cross-Team Integration",
       "tier": "Cross-Tier Architecture",
       "reportsTo": "apex-pm",
-      "directReports": ["apex-ui", "apex-java", "apex-db"],
+      "directReports": [
+        "apex-ui",
+        "apex-java",
+        "apex-db",
+        "apex-deploy",
+        "apex-mobile"
+      ],
       "duties": [
-        "Own end-to-end 3-tier integration across Firebase Hosting, Render Java 21 middleware, and Neon Serverless PostgreSQL",
-        "Govern REST API contracts (/api/v1/*), JWT RBAC boundaries, CORS policies, and Razorpay webhook contracts",
-        "Coordinate apex-ui, apex-java, and apex-db on schema alignment, paise ledger precision, and ACID concurrency",
-        "Validate multi-tier resilience, cold-start behavior, and end-to-end acceptance workflows"
+        "Own end-to-end 3-tier integration across Firebase Hosting, Android & iOS mobile apps, Render Java 21 middleware, and Neon Serverless PostgreSQL",
+        "Govern REST API contracts (/api/v1/*), JWT RBAC boundaries, CORS policies, and Razorpay webhook contracts across web and mobile clients",
+        "Ensure all backend, schema, and feature changes remain backward-compatible and synchronized across Web, Android, and iOS using the same Java backend and Neon PostgreSQL database",
+        "Coordinate apex-ui, apex-java, apex-db, apex-deploy, and apex-mobile on schema alignment, paise ledger precision, ACID concurrency, and multi-platform parity"
       ],
       "artifacts": [
         "docs/technical-spec-java-backend-architecture.md",
@@ -188,6 +206,48 @@
         "data-model.md",
         "firestore.rules",
         "firestore.indexes.json"
+      ]
+    },
+    "apex-deploy": {
+      "name": "Cloud Release & Free-Tier Deployment Engineer",
+      "slug": "apex-deploy",
+      "role": "All-Tier Free-Tier Release, GitHub Sync & Live Endpoint Verification",
+      "tier": "Cross-Tier Deployment (Firebase Spark + Render Free + Neon Free)",
+      "reportsTo": "apex-tech-lead",
+      "directReports": [],
+      "duties": [
+        "Deploy Tier 1 web/PWA assets and Firestore rules/indexes to Firebase Hosting Spark Free Tier (project-apex-pushp)",
+        "Coordinate Tier 2 Render Docker Free Tier deployment via render.yaml and Tier 3 Neon Serverless PostgreSQL Free Tier connectivity (sslmode=require)",
+        "Execute pre-flight test gates (mvn test & npm test), live /api/v1/health + /login verification, and mandatory GitHub sync (pushpendrarait/project-apex)",
+        "Maintain docs/deployment/deployment-guide.md with verified free-tier runbooks and live login URLs"
+      ],
+      "artifacts": [
+        ".firebaserc",
+        "firebase.json",
+        "render.yaml",
+        "docs/deployment/deployment-guide.md"
+      ]
+    },
+    "apex-mobile": {
+      "name": "Mobile Application Developer (Android & iOS)",
+      "slug": "apex-mobile",
+      "role": "Cross-Platform Mobile Engineering (Jetpack Compose Android & SwiftUI iOS) synced with Java/Neon Backend",
+      "tier": "Tier 1b: Mobile Clients (Android Kotlin + iOS SwiftUI)",
+      "reportsTo": "apex-tech-lead",
+      "directReports": [],
+      "duties": [
+        "Develop and maintain native Android (Kotlin + Jetpack Compose in android/) and iOS (SwiftUI in ios/) apps in full parity with the web app",
+        "Keep both Android and iOS clients strictly synchronized with the shared Render Java 21 Spring Boot REST API (/api/v1/*) and Neon Serverless PostgreSQL schema",
+        "Implement every new product or backend requirement across Android and iOS (JWT auth, Dual OTP KYC, dynamic slots, 10-min ACID hold, Razorpay paise checkout, 3-tier refunds, Gate QR)",
+        "Execute Gradle unit/build verification on Android and maintain clean XcodeGen/SwiftPM project manifests & XCTest suites for iOS"
+      ],
+      "artifacts": [
+        "android/",
+        "android/app/src/main/kotlin/com/example/projectapex/network/ApexApiClient.kt",
+        "android/app/src/main/kotlin/com/example/projectapex/data/ApexRepository.kt",
+        "ios/",
+        "ios/Package.swift",
+        "ios/ProjectApex/Sources/Network/ApexApiClient.swift"
       ]
     }
   }

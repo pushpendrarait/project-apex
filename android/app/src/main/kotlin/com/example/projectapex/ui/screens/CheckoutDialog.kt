@@ -23,6 +23,7 @@ import com.example.projectapex.model.BookingPass
 import com.example.projectapex.model.HoldSession
 import com.example.projectapex.ui.theme.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun CheckoutDialog(
@@ -31,9 +32,11 @@ fun CheckoutDialog(
     onDismiss: () -> Unit,
     onBookingComplete: (BookingPass) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
     var promoCodeInput by remember { mutableStateOf("") }
     var appliedPromoCode by remember { mutableStateOf<String?>(null) }
     var promoError by remember { mutableStateOf<String?>(null) }
+    var isProcessingPayment by remember { mutableStateOf(false) }
 
     var selectedPaymentMethod by remember { mutableStateOf("UPI") }
 
@@ -51,8 +54,12 @@ fun CheckoutDialog(
         }
     }
 
-    val quote = remember(hold, appliedPromoCode) {
-        repository.calculateQuote(hold, appliedPromoCode)
+    var quote by remember(hold, appliedPromoCode) {
+        mutableStateOf(repository.calculateQuote(hold, appliedPromoCode))
+    }
+
+    LaunchedEffect(hold, appliedPromoCode) {
+        quote = repository.calculateQuoteWithBackend(hold, appliedPromoCode)
     }
 
     Dialog(
@@ -126,7 +133,7 @@ fun CheckoutDialog(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Protected from concurrent booking on Firebase",
+                                text = "Protected from concurrent booking on Render + Neon",
                                 color = TextMuted,
                                 fontSize = 10.sp
                             )
@@ -208,11 +215,12 @@ fun CheckoutDialog(
                         )
                         Button(
                             onClick = {
-                                if (promoCodeInput.trim() in listOf("WELCOME50", "APEX20")) {
-                                    appliedPromoCode = promoCodeInput.trim()
+                                val normalized = promoCodeInput.trim().uppercase()
+                                if (normalized in listOf("WELCOME50", "APEX20", "THANE50", "TURF20")) {
+                                    appliedPromoCode = normalized
                                     promoError = null
                                 } else {
-                                    promoError = "Invalid code. Try WELCOME50 or APEX20"
+                                    promoError = "Invalid code. Try WELCOME50, THANE50, APEX20, or TURF20"
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = TurfEmerald),
@@ -357,9 +365,14 @@ fun CheckoutDialog(
                 // Razorpay Action Button
                 Button(
                     onClick = {
-                        val pass = repository.confirmBooking(hold, quote)
-                        onBookingComplete(pass)
+                        isProcessingPayment = true
+                        scope.launch {
+                            val pass = repository.confirmBookingWithBackend(hold, quote, appliedPromoCode)
+                            isProcessingPayment = false
+                            onBookingComplete(pass)
+                        }
                     },
+                    enabled = !isProcessingPayment,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
@@ -367,7 +380,7 @@ fun CheckoutDialog(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        text = "Pay ₹${quote.totalPayableRupees} & Confirm Pass",
+                        text = if (isProcessingPayment) "Confirming Booking..." else "Pay ₹${quote.totalPayableRupees} & Confirm Pass",
                         color = TextWhite,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold

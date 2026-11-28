@@ -42,8 +42,14 @@ fun VenueDetailScreen(
         courts.filter { it.venueId == venue.id }
     }
 
-    var selectedCourt by remember {
+    var selectedCourt by remember(venue.id) {
         mutableStateOf(venueCourts.firstOrNull())
+    }
+
+    LaunchedEffect(venueCourts) {
+        if (selectedCourt == null && venueCourts.isNotEmpty()) {
+            selectedCourt = venueCourts.first()
+        }
     }
 
     // 14-Day Calendar Dates
@@ -65,20 +71,26 @@ fun VenueDetailScreen(
         mutableStateOf(dateList.firstOrNull()?.first ?: "")
     }
 
-    // Slots for selected court & date
-    val availableSlots = remember(selectedCourt, selectedDateKey) {
-        if (selectedCourt != null && selectedDateKey.isNotBlank()) {
-            repository.getDynamicSlotsForDate(selectedCourt!!.id, selectedDateKey)
-        } else {
-            emptyList()
-        }
+    // Slots for selected court & date (live Render + Neon availability with instant local fallback)
+    var availableSlots by remember(selectedCourt, selectedDateKey) {
+        mutableStateOf(
+            if (selectedCourt != null && selectedDateKey.isNotBlank()) {
+                repository.getDynamicSlotsForDate(selectedCourt!!.id, selectedDateKey)
+            } else {
+                emptyList()
+            }
+        )
     }
 
     val selectedSlotIds = remember { mutableStateListOf<String>() }
 
-    // Clear slot selection when court or date changes
+    // Clear slot selection & fetch live availability when court or date changes
     LaunchedEffect(selectedCourt?.id, selectedDateKey) {
         selectedSlotIds.clear()
+        val crt = selectedCourt
+        if (crt != null && selectedDateKey.isNotBlank()) {
+            availableSlots = repository.loadSlotsForDate(crt.id, selectedDateKey)
+        }
     }
 
     val selectedSlots = remember(selectedSlotIds.toList(), availableSlots) {

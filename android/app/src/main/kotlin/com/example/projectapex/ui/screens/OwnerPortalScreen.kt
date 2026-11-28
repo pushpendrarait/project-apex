@@ -20,12 +20,14 @@ import com.example.projectapex.model.Court
 import com.example.projectapex.model.SportType
 import com.example.projectapex.model.Venue
 import com.example.projectapex.ui.theme.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun OwnerPortalScreen(
     repository: ApexRepository,
     modifier: Modifier = Modifier
 ) {
+    val scope = rememberCoroutineScope()
     val venues by repository.venues.collectAsState()
     val courts by repository.courts.collectAsState()
     val passes by repository.bookingPasses.collectAsState()
@@ -134,7 +136,9 @@ fun OwnerPortalScreen(
                         Button(
                             onClick = {
                                 if (scanCodeInput.isNotBlank()) {
-                                    scanResult = repository.verifyGateQr(scanCodeInput)
+                                    scope.launch {
+                                        scanResult = repository.verifyGateQrWithBackend(scanCodeInput)
+                                    }
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = TurfEmerald),
@@ -209,17 +213,19 @@ fun OwnerPortalScreen(
             venues = venues,
             onDismiss = { showAddCourtDialog = false },
             onSave = { venueId, name, sportType, capacity, surface, isIndoor, dimensions, basePrice, peakPrice ->
-                repository.addCourt(
-                    venueId = venueId,
-                    name = name,
-                    sportType = sportType,
-                    capacity = capacity,
-                    surfaceType = surface,
-                    isIndoor = isIndoor,
-                    dimensions = dimensions,
-                    basePricePaise = basePrice * 100L,
-                    peakPricePaise = peakPrice * 100L
-                )
+                scope.launch {
+                    repository.addCourtWithBackend(
+                        venueId = venueId,
+                        name = name,
+                        sportType = sportType,
+                        capacity = capacity,
+                        surfaceType = surface,
+                        isIndoor = isIndoor,
+                        dimensions = dimensions,
+                        basePricePaise = basePrice * 100L,
+                        peakPricePaise = peakPrice * 100L
+                    )
+                }
                 showAddCourtDialog = false
             }
         )

@@ -11,10 +11,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.projectapex.model.HealthStatus
 import com.example.projectapex.model.UserRole
 import com.example.projectapex.model.UserSession
 import com.example.projectapex.ui.theme.*
@@ -27,8 +27,22 @@ fun AppTopBar(
     onCityClick: () -> Unit,
     onAuthClick: () -> Unit,
     onBackendClick: () -> Unit,
-    onSwitchRoleClick: () -> Unit
+    onSwitchRoleClick: () -> Unit,
+    healthStatus: HealthStatus? = null
 ) {
+    val backendPillLabel = if (isBackendConnected) {
+        val dbName = healthStatus?.database.orEmpty()
+        val hosting = healthStatus?.hosting.orEmpty()
+        val isLocal = hosting.contains("local", ignoreCase = true) ||
+            healthStatus?.url?.contains("10.0.2.2") == true ||
+            healthStatus?.url?.contains("localhost") == true
+        val tier2Short = if (isLocal) "Java" else "Render"
+        val dbShort = if (dbName.contains("H2", ignoreCase = true)) "H2" else "Neon"
+        if (healthStatus == null) "API + DB" else if (healthStatus.dbConnected) "$tier2Short + $dbShort" else "API + DB"
+    } else {
+        "Offline Engine"
+    }
+
     Surface(
         color = BgMidnight,
         modifier = Modifier.fillMaxWidth()
@@ -93,7 +107,11 @@ fun AppTopBar(
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
                             .background(SurfaceElevated)
-                            .border(1.dp, SurfaceBorder, RoundedCornerShape(16.dp))
+                            .border(
+                                1.dp,
+                                if (isBackendConnected) TurfEmerald.copy(alpha = 0.45f) else SurfaceBorder,
+                                RoundedCornerShape(16.dp)
+                            )
                             .clickable(onClick = onBackendClick)
                             .padding(horizontal = 8.dp, vertical = 5.dp)
                     ) {
@@ -105,10 +123,10 @@ fun AppTopBar(
                         )
                         Spacer(modifier = Modifier.width(5.dp))
                         Text(
-                            text = if (isBackendConnected) "API Online" else "Offline Engine",
-                            color = TextSecondary,
+                            text = backendPillLabel,
+                            color = if (isBackendConnected) TurfEmerald else TextSecondary,
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
 
