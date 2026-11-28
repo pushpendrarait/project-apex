@@ -24,11 +24,20 @@
     ],
     "headers": [
       {
-        "source": "**/*.@(js|css|png|jpg|jpeg|gif|svg|webp|woff2)",
+        "source": "**/*.@(png|jpg|jpeg|gif|svg|webp|woff2)",
         "headers": [
           {
             "key": "Cache-Control",
             "value": "max-age=31536000, immutable"
+          }
+        ]
+      },
+      {
+        "source": "src/**/*.@(js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, must-revalidate"
           }
         ]
       },

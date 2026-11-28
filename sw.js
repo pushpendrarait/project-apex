@@ -3,7 +3,7 @@
  * Network-First with Cache Fallback for Offline Ticket Pass Resilience
  */
 
-const CACHE_NAME = 'project-apex-v1.0.0';
+const CACHE_NAME = 'project-apex-v3.0.0';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -32,6 +32,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  if (!event.request.url.startsWith(self.location.origin)) return;
 
   event.respondWith(
     fetch(event.request)
