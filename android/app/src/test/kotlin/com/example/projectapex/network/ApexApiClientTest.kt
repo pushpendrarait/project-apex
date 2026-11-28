@@ -11,16 +11,16 @@ class ApexApiClientTest {
     @Test
     fun testNormalizeBaseUrlStripsSlashesAndApiV1Suffix() {
         assertEquals(
-            "https://project-apex-backend.onrender.com",
-            ApexApiClient.normalizeBaseUrl("https://project-apex-backend.onrender.com/")
+            "https://project-apex-backend-fqe3.onrender.com",
+            ApexApiClient.normalizeBaseUrl("https://project-apex-backend-fqe3.onrender.com/")
         )
         assertEquals(
-            "https://project-apex-backend.onrender.com",
-            ApexApiClient.normalizeBaseUrl("https://project-apex-backend.onrender.com/api/v1")
+            "https://project-apex-backend-fqe3.onrender.com",
+            ApexApiClient.normalizeBaseUrl("https://project-apex-backend-fqe3.onrender.com/api/v1")
         )
         assertEquals(
-            "https://project-apex-backend.onrender.com",
-            ApexApiClient.normalizeBaseUrl("  https://project-apex-backend.onrender.com/API/V1///  ")
+            "https://project-apex-backend-fqe3.onrender.com",
+            ApexApiClient.normalizeBaseUrl("  https://project-apex-backend-fqe3.onrender.com/API/V1///  ")
         )
         assertEquals(
             "http://10.0.2.2:8080",
@@ -34,7 +34,7 @@ class ApexApiClientTest {
     fun testDefaultBaseUrlMatchesRenderProduction() {
         val client = ApexApiClient()
         assertEquals(ApexApiClient.RENDER_PROD_URL, client.baseUrl)
-        assertEquals("https://project-apex-backend.onrender.com", ApexApiClient.RENDER_PROD_URL)
+        assertEquals("https://project-apex-backend-fqe3.onrender.com", ApexApiClient.RENDER_PROD_URL)
         assertEquals("http://10.0.2.2:8080", ApexApiClient.EMULATOR_LOCAL_URL)
     }
 
@@ -73,7 +73,7 @@ class ApexApiClientTest {
         assertEquals(4L, health.venuesCount)
         assertEquals(29L, health.bookingsCount)
         assertEquals(142L, health.latencyMs)
-        assertEquals("https://project-apex-backend.onrender.com", health.url)
+        assertEquals(ApexApiClient.RENDER_PROD_URL, health.url)
     }
 
     @Test

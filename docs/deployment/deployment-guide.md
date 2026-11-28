@@ -128,6 +128,6 @@ After deployment, verify both public tiers directly via HTTP `GET`:
 
 3. **Tier 2 + Tier 3 Health & DB Connectivity:**
    ```bash
-   curl -i https://project-apex-backend.onrender.com/api/v1/health
+   curl -i https://project-apex-backend-fqe3.onrender.com/api/v1/health
    ```
    Expect `HTTP/2 200` with JSON payload `"status":"UP"`, `"service":"project-apex-backend"`, `"database":"Neon PostgreSQL"`, and `"dbConnected":true`. *(Note: Render Free Tier instances spin down after idle periods; allow up to ~50s on cold start.)*

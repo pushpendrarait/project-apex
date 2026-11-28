@@ -3,7 +3,7 @@
 Native iOS 16+ SwiftUI client synchronized 1-to-1 with the **Project Apex** Web (Firebase Hosting) and Android (Kotlin/Jetpack Compose) applications, sharing the exact same **3-Tier Architecture**:
 
 1. **Tier 1 (Client):** Native iOS SwiftUI (`ProjectApex`)
-2. **Tier 2 (Middleware):** Render Java 21 LTS + Spring Boot 3.2.x REST API (`https://project-apex-backend.onrender.com/api/v1/*`)
+2. **Tier 2 (Middleware):** Render Java 21 LTS + Spring Boot 3.2.x REST API (`https://project-apex-backend-fqe3.onrender.com/api/v1/*`)
 3. **Tier 3 (Database):** Neon Serverless PostgreSQL (with H2 PostgreSQL-Mode fallback in local dev)
 
 ## Features & Contract Parity
@@ -13,7 +13,7 @@ Native iOS 16+ SwiftUI client synchronized 1-to-1 with the **Project Apex** Web 
 - **Match Passes & High-Contrast Gate QR:** `/api/v1/bookings/my` and `/api/v1/bookings/{id}/cancel` enforcing the 3-tier refund policy (`>=24h`, `6–23h`, `<6h`).
 - **Owner Portal & Gate Scanner:** `/api/v1/gate/verify-pass`, `/api/v1/gate/walk-in`, and `/api/v1/facilities`.
 - **Dual Auth & JWT Bearer:** Password and OTP login/registration (`/api/v1/auth/*`) injecting `Authorization: Bearer <token>` and `X-User-Id` / `X-Owner-Id`.
-- **3-Tier Live Health Monitor:** Calls `/api/v1/health` with 8s timeout (for Render JVM cold starts) and 1-tap presets for **Render Cloud** (`https://project-apex-backend.onrender.com`) and **Simulator Localhost** (`http://localhost:8080`).
+- **3-Tier Live Health Monitor:** Calls `/api/v1/health` with 8s timeout (for Render JVM cold starts) and 1-tap presets for **Render Cloud** (`https://project-apex-backend-fqe3.onrender.com`) and **Simulator Localhost** (`http://localhost:8080`).
 
 ## Building & Running on macOS / Xcode
 

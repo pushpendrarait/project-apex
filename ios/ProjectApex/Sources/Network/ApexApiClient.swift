@@ -18,7 +18,7 @@ public enum ApexApiError: LocalizedError {
 }
 
 public final class ApexApiClient: @unchecked Sendable {
-    public static let renderProdURL = "https://project-apex-backend.onrender.com"
+    public static let renderProdURL = "https://project-apex-backend-fqe3.onrender.com"
     public static let simulatorLocalURL = "http://localhost:8080"
     public static let defaultTimeoutSeconds: TimeInterval = 8.0
 

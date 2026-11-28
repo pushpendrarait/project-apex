@@ -26,7 +26,7 @@ class ApexApiClient(
     var activeUserId: String? = null
 
     companion object {
-        const val RENDER_PROD_URL = "https://project-apex-backend.onrender.com"
+        const val RENDER_PROD_URL = "https://project-apex-backend-fqe3.onrender.com"
         const val EMULATOR_LOCAL_URL = "http://10.0.2.2:8080"
         const val DEFAULT_TIMEOUT_MS = 8000
 

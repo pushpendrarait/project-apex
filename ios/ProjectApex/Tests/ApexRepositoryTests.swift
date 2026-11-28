@@ -138,8 +138,8 @@ final class ApexRepositoryTests: XCTestCase {
 
     func testApiClientUrlNormalizationAndHealthDecoding() throws {
         XCTAssertEqual(
-            ApexApiClient.normalizeBaseUrl("https://project-apex-backend.onrender.com/api/v1/"),
-            "https://project-apex-backend.onrender.com"
+            ApexApiClient.normalizeBaseUrl("https://project-apex-backend-fqe3.onrender.com/api/v1/"),
+            "https://project-apex-backend-fqe3.onrender.com"
         )
         XCTAssertEqual(
             ApexApiClient.normalizeBaseUrl("  http://localhost:8080/API/V1/// "),

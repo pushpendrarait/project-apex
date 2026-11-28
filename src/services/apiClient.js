@@ -5,7 +5,7 @@
  */
 
 const LOCAL_API_BASE_URL = 'http://localhost:8080/api/v1';
-const RENDER_API_BASE_URL = 'https://project-apex-backend.onrender.com/api/v1';
+const RENDER_API_BASE_URL = 'https://project-apex-backend-fqe3.onrender.com/api/v1';
 const CUSTOM_API_URL_KEY = 'apex_custom_api_url';
 const TOKEN_KEY = 'apex_jwt_token';
 const ACTIVE_USER_KEY = 'apex_active_user_id';
