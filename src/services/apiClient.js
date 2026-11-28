@@ -1,44 +1,120 @@
 /**
  * Project Apex - Java Middleware REST API Client
- * Connects the frontend to the Java Spring Boot backend (port 8080)
- * with automatic fallback to local runtime if offline
+ * Connects the Firebase Hosting frontend to the Render Java Spring Boot Middleware
+ * and Neon PostgreSQL database, with automatic fallback to local runtime if offline.
  */
 
-let customApiBaseUrl = typeof window !== 'undefined' && window.APEX_API_URL 
-  ? window.APEX_API_URL 
-  : (typeof window !== 'undefined' && window.localStorage?.getItem('apex_custom_api_url') 
-      ? window.localStorage.getItem('apex_custom_api_url') 
-      : 'http://localhost:8080/api/v1');
-
+const LOCAL_API_BASE_URL = 'http://localhost:8080/api/v1';
+const RENDER_API_BASE_URL = 'https://project-apex-backend.onrender.com/api/v1';
+const CUSTOM_API_URL_KEY = 'apex_custom_api_url';
 const TOKEN_KEY = 'apex_jwt_token';
 const ACTIVE_USER_KEY = 'apex_active_user_id';
+const HEALTH_TIMEOUT_MS = 8000;
+
+function normalizeBaseUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  let cleaned = url.trim();
+  if (!cleaned) return '';
+  cleaned = cleaned.replace(/\/+$/, '');
+  if (/\/api\/v1$/i.test(cleaned)) {
+    cleaned = cleaned.replace(/\/api\/v1$/i, '/api/v1');
+  } else {
+    cleaned = `${cleaned}/api/v1`;
+  }
+  return cleaned;
+}
+
+function getDefaultBaseUrl() {
+  if (
+    typeof window !== 'undefined' &&
+    (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')
+  ) {
+    return LOCAL_API_BASE_URL;
+  }
+  return RENDER_API_BASE_URL;
+}
+
+function readStoredCustomUrl() {
+  if (typeof localStorage !== 'undefined') {
+    return localStorage.getItem(CUSTOM_API_URL_KEY);
+  }
+  if (typeof window !== 'undefined') {
+    return window.localStorage?.getItem(CUSTOM_API_URL_KEY) || null;
+  }
+  return null;
+}
+
+function resolveInitialBaseUrl() {
+  if (typeof window !== 'undefined' && typeof window.APEX_API_URL === 'string' && window.APEX_API_URL.trim()) {
+    return normalizeBaseUrl(window.APEX_API_URL);
+  }
+  const storedCustomUrl = readStoredCustomUrl();
+  if (storedCustomUrl && storedCustomUrl.trim()) {
+    return normalizeBaseUrl(storedCustomUrl);
+  }
+  return getDefaultBaseUrl();
+}
+
+let customApiBaseUrl = resolveInitialBaseUrl();
 let memoryToken = null;
 
 export class ApiClient {
+  static normalizeBaseUrl(url) {
+    return normalizeBaseUrl(url);
+  }
+
+  static getDefaultBaseUrl() {
+    return getDefaultBaseUrl();
+  }
+
   static getBaseUrl() {
     return customApiBaseUrl;
   }
 
   static setBaseUrl(url) {
-    if (url && url.trim()) {
-      customApiBaseUrl = url.trim();
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('apex_custom_api_url', customApiBaseUrl);
-      }
+    const normalized = normalizeBaseUrl(url);
+    if (!normalized) {
+      return this.resetBaseUrl();
     }
+    customApiBaseUrl = normalized;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(CUSTOM_API_URL_KEY, customApiBaseUrl);
+    }
+    return customApiBaseUrl;
   }
 
-  static async checkHealth() {
+  static resetBaseUrl() {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(CUSTOM_API_URL_KEY);
+    }
+    customApiBaseUrl =
+      typeof window !== 'undefined' && typeof window.APEX_API_URL === 'string' && window.APEX_API_URL.trim()
+        ? normalizeBaseUrl(window.APEX_API_URL)
+        : getDefaultBaseUrl();
+    return customApiBaseUrl;
+  }
+
+  static async checkHealth(targetUrl = null) {
+    const base = targetUrl ? normalizeBaseUrl(targetUrl) : this.getBaseUrl();
+    if (!base) {
+      return { isOnline: false, error: 'Invalid backend URL', url: base };
+    }
+    const startedAt = Date.now();
     try {
-      const url = `${this.getBaseUrl()}/health`;
-      const res = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(3000) });
+      const url = `${base}/health`;
+      const signal =
+        typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+          ? AbortSignal.timeout(HEALTH_TIMEOUT_MS)
+          : undefined;
+      const res = await fetch(url, { method: 'GET', signal });
+      const latencyMs = Date.now() - startedAt;
       if (res.ok) {
         const data = await res.json();
-        return { isOnline: true, data };
+        return { isOnline: true, data, url: base, latencyMs };
       }
-      return { isOnline: false, error: `HTTP ${res.status}` };
+      return { isOnline: false, error: `HTTP ${res.status}`, url: base, latencyMs };
     } catch (e) {
-      return { isOnline: false, error: e.message };
+      return { isOnline: false, error: e.message, url: base, latencyMs: Date.now() - startedAt };
     }
   }
 
@@ -85,9 +161,17 @@ export class ApiClient {
 
     try {
       const response = await fetch(url, config);
-      const data = await response.json();
+      const rawText = await response.text();
+      let data = {};
+      if (rawText) {
+        try {
+          data = JSON.parse(rawText);
+        } catch {
+          data = {};
+        }
+      }
       if (!response.ok) {
-        throw new Error(data.message || `HTTP ${response.status}: Request failed`);
+        throw new Error(data?.message || `HTTP ${response.status}: Request failed`);
       }
       return data;
     } catch (err) {

@@ -107,6 +107,7 @@ public class WebhookService {
                 booking.setRefundId(refundId);
                 booking.setRefundStatus("INITIATED");
                 booking.setUpdatedAt(now);
+                firebaseService.persistBooking(booking);
                 return;
             }
         }
@@ -118,6 +119,7 @@ public class WebhookService {
         booking.setRazorpayPaymentId(paymentId);
         booking.setHoldExpiresAt(null);
         booking.setUpdatedAt(now);
+        firebaseService.persistBooking(booking);
 
         // Transition slot locks
         for (BookingRecord.BookedSlotItem slot : booking.getSlots()) {
@@ -126,6 +128,7 @@ public class WebhookService {
             if (lock != null) {
                 lock.setStatus("BOOKED");
                 lock.setHoldExpiresAt(null);
+                firebaseService.persistSlotLock(lock);
             }
         }
 
@@ -143,6 +146,7 @@ public class WebhookService {
 
         booking.setStatus("PAYMENT_FAILED");
         booking.setUpdatedAt(System.currentTimeMillis());
+        firebaseService.persistBooking(booking);
 
         // Release locks
         for (BookingRecord.BookedSlotItem slot : booking.getSlots()) {

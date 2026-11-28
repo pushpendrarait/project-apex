@@ -65,11 +65,14 @@ public class BookingService {
 
         long now = System.currentTimeMillis();
 
-        // 1. Atomic Concurrency Lock Check
+        // 1. Atomic Concurrency Lock Check (In-memory + DB fallback for multi-instance consistency)
         List<String> lockIds = new ArrayList<>();
         for (String startTime : slotStartTimes) {
             String lockId = SlotLockRecord.buildLockId(resourceId, date, startTime);
             SlotLockRecord existingLock = firebaseService.getSlotLocks().get(lockId);
+            if (existingLock == null || existingLock.isExpired()) {
+                existingLock = firebaseService.findActiveDbSlotLock(resourceId, date, startTime).orElse(existingLock);
+            }
 
             if (existingLock != null) {
                 if ("BOOKED".equalsIgnoreCase(existingLock.getStatus())) {
@@ -91,14 +94,23 @@ public class BookingService {
 
         long holdExpiresAt = now + HOLD_TTL_MS;
 
-        // 3. Acquire 10-minute HELD locks
-        for (String startTime : slotStartTimes) {
-            String lockId = SlotLockRecord.buildLockId(resourceId, date, startTime);
-            LocalTime s = LocalTime.parse(startTime);
-            LocalTime e = s.plusMinutes(resource != null ? resource.getSlotDurationMinutes() : 60);
+        // 3. Acquire 10-minute HELD locks (ACID rollback on multi-slot conflict)
+        List<String> acquiredLockIds = new ArrayList<>();
+        try {
+            for (String startTime : slotStartTimes) {
+                String lockId = SlotLockRecord.buildLockId(resourceId, date, startTime);
+                LocalTime s = LocalTime.parse(startTime);
+                LocalTime e = s.plusMinutes(resource != null ? resource.getSlotDurationMinutes() : 60);
 
-            SlotLockRecord lock = new SlotLockRecord(resourceId, venueId, date, startTime, e.toString(), bookingId, userId, HOLD_TTL_MS);
-            firebaseService.getSlotLocks().put(lockId, lock);
+                SlotLockRecord lock = new SlotLockRecord(resourceId, venueId, date, startTime, e.toString(), bookingId, userId, HOLD_TTL_MS);
+                firebaseService.getSlotLocks().put(lockId, lock);
+                acquiredLockIds.add(lockId);
+            }
+        } catch (RuntimeException ex) {
+            for (String lid : acquiredLockIds) {
+                firebaseService.getSlotLocks().remove(lid);
+            }
+            throw ex;
         }
 
         // 4. Create Razorpay Order
@@ -179,6 +191,7 @@ public class BookingService {
         booking.setRazorpayPaymentId(req.getRazorpayPaymentId());
         booking.setHoldExpiresAt(null);
         booking.setUpdatedAt(System.currentTimeMillis());
+        firebaseService.persistBooking(booking);
 
         // Transition slot locks from HELD to BOOKED
         for (BookingRecord.BookedSlotItem slot : booking.getSlots()) {
@@ -187,6 +200,7 @@ public class BookingService {
             if (lock != null) {
                 lock.setStatus("BOOKED");
                 lock.setHoldExpiresAt(null);
+                firebaseService.persistSlotLock(lock);
             }
         }
 
@@ -203,6 +217,7 @@ public class BookingService {
             DiscountRecord d = firebaseService.getDiscounts().get(booking.getDiscountId());
             if (d != null) {
                 d.setCurrentUses(d.getCurrentUses() + 1);
+                firebaseService.persistDiscount(d);
             }
         }
 
@@ -270,6 +285,7 @@ public class BookingService {
         booking.setStatus("CANCELLED_BY_USER");
         booking.setCancellationReason(reason);
         booking.setUpdatedAt(System.currentTimeMillis());
+        firebaseService.persistBooking(booking);
 
         log.info("Cancelled booking: {} by player. Refund amount: ₹{}", bookingId, (double) refundAmountPaise / 100);
         return booking;
@@ -302,6 +318,7 @@ public class BookingService {
         booking.setStatus("CANCELLED_BY_OWNER");
         booking.setCancellationReason(reason);
         booking.setUpdatedAt(System.currentTimeMillis());
+        firebaseService.persistBooking(booking);
 
         log.info("Emergency cancellation by owner: {} for booking: {}. 100% refund of ₹{}",
                 ownerId, bookingId, (double) fullRefundPaise / 100);
@@ -339,6 +356,7 @@ public class BookingService {
         }
         booking.setStatus(newStatus.toUpperCase());
         booking.setUpdatedAt(System.currentTimeMillis());
+        firebaseService.persistBooking(booking);
         return booking;
     }
 
@@ -353,6 +371,7 @@ public class BookingService {
             if ("PENDING_PAYMENT".equalsIgnoreCase(b.getStatus()) && b.getHoldExpiresAt() != null && b.getHoldExpiresAt() < now) {
                 b.setStatus("EXPIRED");
                 b.setUpdatedAt(now);
+                firebaseService.persistBooking(b);
 
                 // Release locks
                 for (BookingRecord.BookedSlotItem slot : b.getSlots()) {
@@ -495,6 +514,7 @@ public class BookingService {
     public synchronized BookingRecord cancelBooking(String bookingId, String userId) {
         BookingRecord b = cancelBookingByPlayer(bookingId, userId, "Test Cancellation");
         b.setStatus("CANCELLED");
+        firebaseService.persistBooking(b);
         return b;
     }
 
@@ -526,6 +546,8 @@ public class BookingService {
         }
 
         matched.setStatus("CHECKED_IN");
+        matched.setUpdatedAt(System.currentTimeMillis());
+        firebaseService.persistBooking(matched);
         res.put("success", true);
         res.put("valid", true);
         res.put("alreadyCheckedIn", false);
@@ -560,6 +582,8 @@ public class BookingService {
         }
 
         matched.setStatus("CHECKED_IN");
+        matched.setUpdatedAt(System.currentTimeMillis());
+        firebaseService.persistBooking(matched);
         res.put("valid", true);
         res.put("booking", matched);
         res.put("message", "Pass verified! Access granted.");

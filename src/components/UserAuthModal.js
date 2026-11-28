@@ -25,7 +25,7 @@ export class UserAuthModal {
     let backendStatus = await ApiClient.checkHealth();
 
     // State for login and registration flows
-    let currentMode = initialTab === 'owner' || initialTab === 'player' ? 'signup' : 'signin';
+    let currentMode = ['owner', 'player', 'register', 'signup'].includes(initialTab) ? 'signup' : 'signin';
     let signinSubMode = 'password'; // 'password' | 'otp'
     let signupRole = initialTab === 'owner' ? 'owner' : 'player';
     let pendingRegistration = null;

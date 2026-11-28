@@ -32,6 +32,7 @@ public class AdminService {
             user.getOwnerProfile().setVerificationStatus(status.toUpperCase());
             user.getOwnerProfile().setVerifiedAt(System.currentTimeMillis());
             user.setUpdatedAt(System.currentTimeMillis());
+            firebaseService.persistUser(user);
         }
         return user;
     }
@@ -43,6 +44,7 @@ public class AdminService {
         }
         v.setStatus(status.toUpperCase());
         v.setUpdatedAt(System.currentTimeMillis());
+        firebaseService.persistVenue(v);
         return v;
     }
 }

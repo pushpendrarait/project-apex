@@ -99,7 +99,7 @@ public class OtpService {
 
         // Security Audit Log
         AuditLog audit = new AuditLog(
-                "audit_" + now,
+                "audit_" + now + "_" + UUID.randomUUID().toString().substring(0, 6),
                 "OTP_DISPATCHED",
                 "system_auth",
                 "otp_session",
@@ -133,6 +133,7 @@ public class OtpService {
 
         if (!phoneMatch || !emailMatch) {
             session.setAttemptsRemaining(session.getAttemptsRemaining() - 1);
+            firebaseService.persistOtpSession(session);
             if (!phoneMatch && !emailMatch) {
                 throw new IllegalArgumentException("Incorrect Mobile SMS OTP and Email verification code. (" + session.getAttemptsRemaining() + " attempts remaining)");
             } else if (!phoneMatch) {
@@ -143,10 +144,11 @@ public class OtpService {
         }
 
         session.setVerified(true);
+        firebaseService.persistOtpSession(session);
         log.info("✓ Dual OTP Verification Succeeded for session: {}", sessionId);
 
         AuditLog audit = new AuditLog(
-                "audit_" + System.currentTimeMillis(),
+                "audit_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 6),
                 "OTP_VERIFIED_SUCCESS",
                 "system_auth",
                 "otp_session",
@@ -212,10 +214,12 @@ public class OtpService {
 
         if (!session.getLoginOtp().equals(otp != null ? otp.trim() : "")) {
             session.setAttemptsRemaining(session.getAttemptsRemaining() - 1);
+            firebaseService.persistOtpSession(session);
             throw new IllegalArgumentException("Incorrect Login OTP. (" + session.getAttemptsRemaining() + " attempts remaining)");
         }
 
         session.setVerified(true);
+        firebaseService.persistOtpSession(session);
         UserRecord user = firebaseService.getUsers().get(session.getUserId());
         if (user == null) {
             throw new IllegalStateException("User profile not found.");

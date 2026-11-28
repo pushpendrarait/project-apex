@@ -184,10 +184,10 @@
             <span>+ List Venue</span>
           </button>
 
-          <!-- Java Middleware Status Indicator -->
-          <button id="btn-header-backend" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-[11px] font-mono text-slate-300 transition" title="Java Spring Boot Backend Status">
+          <!-- 3-Tier Architecture & Render Middleware Status Indicator -->
+          <button id="btn-header-backend" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-[11px] font-mono text-slate-300 transition" title="3-Tier Live Architecture: Firebase Hosting → Render Java API → Neon PostgreSQL">
             <span id="header-backend-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
-            <span id="header-backend-label">Backend</span>
+            <span id="header-backend-label">3-Tier API</span>
           </button>
 
           <button id="btn-quick-player" class="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-xs transition" title="Account / Profile">
@@ -301,6 +301,9 @@
     import { ScenarioRunnerModal } from './src/components/ScenarioRunnerModal.js';
     import { ApiClient } from './src/services/apiClient.js';
 
+    const RENDER_PRESET_URL = 'https://project-apex-backend.onrender.com/api/v1';
+    const LOCAL_PRESET_URL = 'http://localhost:8080/api/v1';
+
     class ApexApp {
       constructor() {
         this.appRoot = document.getElementById('app-root');
@@ -308,6 +311,7 @@
         this.selectedVenue = null;
         this.activeBooking = null;
         this.explorer = null;
+        this.lastHealth = null;
         this.init();
       }
 
@@ -319,29 +323,114 @@
         this.checkBackendHealth();
         this.registerServiceWorker();
         this.renderView('explore');
+
+        const pathname = window.location.pathname.replace(/\/+$/, '').toLowerCase();
+        const authParam = (new URLSearchParams(window.location.search).get('auth') || '').toLowerCase();
+        const hash = window.location.hash.toLowerCase();
+        if (
+          pathname === '/login' ||
+          pathname === '/signin' ||
+          authParam === 'login' ||
+          authParam === 'signin' ||
+          hash === '#login' ||
+          hash === '#signin'
+        ) {
+          this.openAuthModal('signin');
+        } else if (
+          pathname === '/register' ||
+          pathname === '/signup' ||
+          authParam === 'register' ||
+          authParam === 'signup' ||
+          hash === '#register' ||
+          hash === '#signup'
+        ) {
+          this.openAuthModal('register');
+        }
+      }
+
+      openAuthModal(initialTab = 'signin') {
+        UserAuthModal.show({
+          initialTab,
+          onUserChanged: () => {
+            this.updateHeaderUser();
+            this.renderView(this.currentView);
+          },
+          onNavigate: (view) => {
+            if (this.setTabActive) this.setTabActive(view);
+            else this.renderView(view);
+          }
+        });
+      }
+
+      escapeHtml(value) {
+        return String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      extractHealthMetadata(health, targetUrl = ApiClient.getBaseUrl()) {
+        const info = health?.data?.data || health?.data || {};
+        const isOnline = Boolean(health?.isOnline);
+        const normalizedUrl = ApiClient.normalizeBaseUrl(targetUrl || '') || ApiClient.getBaseUrl();
+        const isLocal = normalizedUrl.includes('localhost') || normalizedUrl.includes('127.0.0.1');
+        const dbName = info.database || (isOnline ? 'Neon PostgreSQL' : 'Neon Serverless PostgreSQL');
+        const dbConnected = typeof info.dbConnected === 'boolean' ? info.dbConnected : isOnline;
+        return {
+          isOnline,
+          isLocal,
+          targetUrl: normalizedUrl,
+          latencyMs: typeof health?.latencyMs === 'number' ? health.latencyMs : null,
+          error: health?.error || null,
+          service: info.service || 'project-apex-backend',
+          hosting: info.hosting || (isLocal ? 'Localhost Dev (Port 8080)' : 'Render Cloud Middleware'),
+          runtime: info.runtime || 'Java 21 LTS + Spring Boot 3.2.x',
+          database: dbName,
+          dbConnected,
+          usersCount: info.usersCount ?? '—',
+          venuesCount: info.venuesCount ?? '—',
+          bookingsCount: info.bookingsCount ?? '—'
+        };
+      }
+
+      applyBackendHealthUI(health) {
+        this.lastHealth = health;
+        const btn = document.getElementById('btn-header-backend');
+        const dot = document.getElementById('header-backend-dot');
+        const label = document.getElementById('header-backend-label');
+        if (!dot || !label) return;
+
+        const meta = this.extractHealthMetadata(health);
+        if (meta.isOnline) {
+          const tier2Short = meta.isLocal ? 'Java' : 'Render';
+          const dbShort = meta.database.toLowerCase().includes('h2') ? 'H2' : 'Neon';
+          dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+          label.textContent = meta.dbConnected ? `${tier2Short} + ${dbShort}` : `${tier2Short}: Online`;
+          label.className = 'text-emerald-400 font-bold';
+          if (btn) {
+            btn.title = `3-Tier Live: Firebase Hosting → ${meta.hosting} (${meta.service}) → ${meta.database} (${meta.dbConnected ? 'Connected' : 'Disconnected'})`;
+          }
+        } else {
+          dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+          label.textContent = 'API: Standby';
+          label.className = 'text-amber-300 font-semibold';
+          if (btn) {
+            btn.title = '3-Tier Status: Render Java API standby/offline (using resilient local edge cache). Click to inspect or wake.';
+          }
+        }
       }
 
       async checkBackendHealth() {
-        const dot = document.getElementById('header-backend-dot');
-        const label = document.getElementById('header-backend-label');
         try {
           const health = await ApiClient.checkHealth();
-          if (dot && label) {
-            if (health.isOnline) {
-              dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
-              label.textContent = 'Java: Online';
-              label.className = 'text-emerald-400 font-bold';
-            } else {
-              dot.className = 'w-2 h-2 rounded-full bg-amber-400';
-              label.textContent = 'Cloud Mode';
-              label.className = 'text-slate-400';
-            }
-          }
+          this.applyBackendHealthUI(health);
+          return health;
         } catch (e) {
-          if (dot && label) {
-            dot.className = 'w-2 h-2 rounded-full bg-amber-400';
-            label.textContent = 'Cloud Mode';
-          }
+          const fallback = { isOnline: false, error: e.message };
+          this.applyBackendHealthUI(fallback);
+          return fallback;
         }
       }
 
@@ -511,18 +600,7 @@
 
         const btnAuth = document.getElementById('btn-header-auth');
         if (btnAuth) {
-          btnAuth.addEventListener('click', () => {
-            UserAuthModal.show({
-              initialTab: 'signin',
-              onUserChanged: (user) => {
-                this.updateHeaderUser();
-                this.renderView(this.currentView);
-              },
-              onNavigate: (view) => {
-                setTabActive(view);
-              }
-            });
-          });
+          btnAuth.addEventListener('click', () => this.openAuthModal('signin'));
         }
 
         const btnAddVenue = document.getElementById('btn-header-add-venue');
@@ -539,110 +617,283 @@
 
         const btnQuickPlayer = document.getElementById('btn-quick-player');
         if (btnQuickPlayer) {
-          btnQuickPlayer.addEventListener('click', () => {
-            UserAuthModal.show({
-              onUserChanged: (user) => {
-                this.updateHeaderUser();
-                this.renderView(this.currentView);
-              },
-              onNavigate: (view) => {
-                setTabActive(view);
-              }
-            });
-          });
+          btnQuickPlayer.addEventListener('click', () => this.openAuthModal('signin'));
         }
 
         const btnBackend = document.getElementById('btn-header-backend');
         if (btnBackend) {
-          btnBackend.addEventListener('click', async () => {
-            const health = await ApiClient.checkHealth();
-            const currentUrl = ApiClient.getBaseUrl();
-            
-            let modal = document.getElementById('apex-backend-modal');
-            if (!modal) {
-              modal = document.createElement('div');
-              modal.id = 'apex-backend-modal';
-              modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in text-xs text-white';
-              document.body.appendChild(modal);
-            }
-
-            modal.innerHTML = `
-              <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-                <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <div class="flex items-center gap-2">
-                    <span class="w-3 h-3 rounded-full ${health.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}"></span>
-                    <h3 class="text-lg font-black">${health.isOnline ? 'Java Middleware Connected' : 'Java Middleware Endpoint'}</h3>
-                  </div>
-                  <button id="btn-close-backend-modal" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center">✕</button>
-                </div>
-
-                <div class="p-3 rounded-2xl ${health.isOnline ? 'bg-emerald-950/60 border border-emerald-500/30 text-emerald-300' : 'bg-amber-950/60 border border-amber-500/30 text-amber-300'}">
-                  <div class="font-bold mb-1">${health.isOnline ? '🟢 Connected to Java Spring Boot Backend' : 'ℹ️ Backend Offline or Blocked by Browser'}</div>
-                  <p class="text-[11px] ${health.isOnline ? 'text-emerald-400' : 'text-slate-300'}">
-                    ${health.isOnline 
-                      ? `Service: ${health.data?.data?.service || 'project-apex-backend'} (Port 8080) • Cloud Firestore Connected` 
-                      : `Browsers block HTTPS sites from calling HTTP localhost directly (Mixed Content). To connect locally: run 'npm run dev' & open http://localhost:3000, or enter a tunnel/public URL below.`}
-                  </p>
-                </div>
-
-                <div>
-                  <label class="block font-bold uppercase tracking-wider text-slate-400 mb-1">Backend API Base URL</label>
-                  <input id="input-backend-url" type="url" value="${currentUrl}" placeholder="http://localhost:8080/api/v1" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 font-mono text-xs text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-                </div>
-
-                <div id="backend-ping-result" class="hidden text-[11px] p-2.5 rounded-xl"></div>
-
-                <div class="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
-                  <button type="button" id="btn-reset-backend-url" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold transition">Reset to Default</button>
-                  <div class="flex gap-2">
-                    <button type="button" id="btn-test-backend-ping" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition">Test Ping</button>
-                    <button type="button" id="btn-save-backend-url" class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition">Save & Apply</button>
-                  </div>
-                </div>
-              </div>
-            `;
-
-            const close = () => modal.remove();
-            modal.querySelector('#btn-close-backend-modal').addEventListener('click', close);
-
-            const inputUrl = modal.querySelector('#input-backend-url');
-            const pingResult = modal.querySelector('#backend-ping-result');
-
-            modal.querySelector('#btn-reset-backend-url').addEventListener('click', () => {
-              inputUrl.value = 'http://localhost:8080/api/v1';
-            });
-
-            modal.querySelector('#btn-test-backend-ping').addEventListener('click', async () => {
-              pingResult.className = 'text-[11px] p-2.5 rounded-xl bg-slate-800 text-slate-300 block';
-              pingResult.textContent = 'Pinging ' + inputUrl.value + '/health...';
-              try {
-                const res = await fetch(`${inputUrl.value.trim()}/health`, { method: 'GET', signal: AbortSignal.timeout(3000) });
-                if (res.ok) {
-                  const data = await res.json();
-                  pingResult.className = 'text-[11px] p-2.5 rounded-xl bg-emerald-950 border border-emerald-500/40 text-emerald-300 block';
-                  pingResult.textContent = `✓ 200 OK! Backend responded: ${JSON.stringify(data.data || data)}`;
-                } else {
-                  pingResult.className = 'text-[11px] p-2.5 rounded-xl bg-red-950 border border-red-500/40 text-red-300 block';
-                  pingResult.textContent = `HTTP ${res.status}: Failed to ping health endpoint`;
-                }
-              } catch (err) {
-                pingResult.className = 'text-[11px] p-2.5 rounded-xl bg-red-950 border border-red-500/40 text-red-300 block';
-                pingResult.textContent = `Error: ${err.message}`;
-              }
-            });
-
-            modal.querySelector('#btn-save-backend-url').addEventListener('click', async () => {
-              ApiClient.setBaseUrl(inputUrl.value.trim());
-              await this.checkBackendStatus();
-              close();
-            });
-          });
+          btnBackend.addEventListener('click', () => this.openBackendArchitectureModal());
         }
 
         document.getElementById('mobile-tab-explore').addEventListener('click', () => setTabActive('explore'));
         document.getElementById('mobile-tab-bookings').addEventListener('click', () => setTabActive('bookings'));
         document.getElementById('mobile-tab-partner').addEventListener('click', () => setTabActive('partner'));
         document.getElementById('mobile-tab-admin').addEventListener('click', () => setTabActive('admin'));
+      }
+
+      renderArchitectureTiersHtml(health, targetUrl, isChecking = false) {
+        const meta = this.extractHealthMetadata(health, targetUrl);
+        const originLabel = typeof window !== 'undefined' && window.location?.origin
+          ? window.location.origin
+          : 'https://project-apex-pushp.web.app';
+        const isHttpsMixed =
+          typeof window !== 'undefined' &&
+          window.location?.protocol === 'https:' &&
+          meta.targetUrl.startsWith('http://');
+
+        const tier2Badge = isChecking
+          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">🔄 Checking...</span>`
+          : meta.isOnline
+            ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">🟢 Online${meta.latencyMs !== null ? ` • ${meta.latencyMs}ms` : ''}</span>`
+            : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">🟡 Standby</span>`;
+
+        const dbBadge = isChecking
+          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">🔄 Checking...</span>`
+          : meta.isOnline
+            ? (meta.dbConnected
+                ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">🟢 Connected</span>`
+                : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/40">🔴 Disconnected</span>`)
+            : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">🟡 Local Fallback</span>`;
+
+        return `
+          <div class="space-y-2.5">
+            <!-- Tier 1: Frontend UI -->
+            <div class="p-3 rounded-2xl bg-slate-950/90 border border-emerald-500/25">
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <div class="flex items-center gap-2">
+                  <span class="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-mono text-[10px] font-bold">TIER 1</span>
+                  <span class="font-bold text-white">Frontend UI • Firebase Hosting</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">🟢 Active</span>
+              </div>
+              <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+                <span>Project: <strong class="text-slate-200 font-mono">project-apex-pushp</strong></span>
+                <span class="font-mono text-slate-300 truncate max-w-[230px]">${this.escapeHtml(originLabel)}</span>
+              </div>
+            </div>
+
+            <!-- Tier 2: Java Spring Boot Middleware -->
+            <div class="p-3 rounded-2xl bg-slate-950/90 border ${meta.isOnline ? 'border-emerald-500/30' : 'border-amber-500/30'}">
+              <div class="flex items-center justify-between gap-2 mb-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 font-mono text-[10px] font-bold">TIER 2</span>
+                  <span class="font-bold text-white">Java Spring Boot API</span>
+                </div>
+                ${tier2Badge}
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[11px]">
+                <div class="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <div class="text-[9px] uppercase text-slate-500 font-bold">Service</div>
+                  <div class="font-mono text-slate-200 truncate" title="${this.escapeHtml(meta.service)}">${this.escapeHtml(meta.service)}</div>
+                </div>
+                <div class="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <div class="text-[9px] uppercase text-slate-500 font-bold">Hosting</div>
+                  <div class="font-mono text-slate-200 truncate" title="${this.escapeHtml(meta.hosting)}">${this.escapeHtml(meta.hosting)}</div>
+                </div>
+                <div class="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <div class="text-[9px] uppercase text-slate-500 font-bold">Runtime</div>
+                  <div class="font-mono text-slate-200 truncate" title="${this.escapeHtml(meta.runtime)}">${this.escapeHtml(meta.runtime)}</div>
+                </div>
+              </div>
+              ${!isChecking && !meta.isOnline ? `
+                <p class="mt-2 text-[11px] text-amber-300/90 leading-relaxed">
+                  ${isHttpsMixed
+                    ? 'HTTPS page cannot call HTTP localhost (Mixed Content). Switch to the Render Production preset or test via http://localhost:3000.'
+                    : `Render middleware is sleeping or unreachable (${this.escapeHtml(meta.error || 'timeout')}). Click <strong>Test Ping</strong> below to wake the JVM.`}
+                </p>
+              ` : ''}
+            </div>
+
+            <!-- Tier 3: Neon Serverless PostgreSQL -->
+            <div class="p-3 rounded-2xl bg-slate-950/90 border ${meta.isOnline && meta.dbConnected ? 'border-emerald-500/30' : 'border-slate-800'}">
+              <div class="flex items-center justify-between gap-2 mb-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 font-mono text-[10px] font-bold">TIER 3</span>
+                  <span class="font-bold text-white">Database • ${this.escapeHtml(meta.database)}</span>
+                </div>
+                ${dbBadge}
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="px-2 py-1.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <div class="text-[9px] uppercase text-slate-500 font-bold">Users</div>
+                  <div class="text-sm font-black text-white font-mono">${this.escapeHtml(meta.usersCount)}</div>
+                </div>
+                <div class="px-2 py-1.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <div class="text-[9px] uppercase text-slate-500 font-bold">Venues</div>
+                  <div class="text-sm font-black text-emerald-400 font-mono">${this.escapeHtml(meta.venuesCount)}</div>
+                </div>
+                <div class="px-2 py-1.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <div class="text-[9px] uppercase text-slate-500 font-bold">Bookings</div>
+                  <div class="text-sm font-black text-cyan-400 font-mono">${this.escapeHtml(meta.bookingsCount)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      openBackendArchitectureModal() {
+        const currentUrl = ApiClient.getBaseUrl();
+        const initialHealth = this.lastHealth || { isOnline: false };
+
+        let modal = document.getElementById('apex-backend-modal');
+        if (!modal) {
+          modal = document.createElement('div');
+          modal.id = 'apex-backend-modal';
+          modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in text-xs text-white';
+          document.body.appendChild(modal);
+        }
+
+        modal.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div class="flex items-center gap-2.5">
+                <span id="modal-backend-dot" class="w-3 h-3 rounded-full bg-indigo-400 animate-pulse"></span>
+                <div>
+                  <h3 class="text-lg font-black leading-tight">3-Tier Live Architecture</h3>
+                  <p class="text-[11px] text-slate-400">Firebase Hosting → Render Java API → Neon PostgreSQL</p>
+                </div>
+              </div>
+              <button id="btn-close-backend-modal" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center" aria-label="Close">✕</button>
+            </div>
+
+            <div id="backend-architecture-tiers">
+              ${this.renderArchitectureTiersHtml(initialHealth, currentUrl, true)}
+            </div>
+
+            <div class="space-y-2 pt-1">
+              <div class="flex items-center justify-between gap-2">
+                <label for="input-backend-url" class="block font-bold uppercase tracking-wider text-slate-400">Tier 2 Middleware API URL</label>
+                <div class="flex items-center gap-1.5">
+                  <button type="button" id="btn-preset-render" class="px-2.5 py-1 rounded-lg text-[10px] font-bold border transition">☁️ Render Prod</button>
+                  <button type="button" id="btn-preset-local" class="px-2.5 py-1 rounded-lg text-[10px] font-bold border transition">💻 Localhost Dev</button>
+                </div>
+              </div>
+              <input id="input-backend-url" type="url" value="${this.escapeHtml(currentUrl)}" placeholder="${RENDER_PRESET_URL}" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 font-mono text-xs text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+              <p class="text-[10px] text-slate-500">Auto-normalizes trailing slashes and appends <span class="font-mono text-slate-400">/api/v1</span> when saved or pinged.</p>
+            </div>
+
+            <div id="backend-ping-result" class="hidden text-[11px] p-2.5 rounded-xl"></div>
+
+            <div class="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+              <button type="button" id="btn-reset-backend-url" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition">Reset to Default</button>
+              <div class="flex gap-2">
+                <button type="button" id="btn-test-backend-ping" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition">Test Ping</button>
+                <button type="button" id="btn-save-backend-url" class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition">Save & Apply</button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const close = () => modal.remove();
+        modal.querySelector('#btn-close-backend-modal').addEventListener('click', close);
+
+        const tiersContainer = modal.querySelector('#backend-architecture-tiers');
+        const modalDot = modal.querySelector('#modal-backend-dot');
+        const inputUrl = modal.querySelector('#input-backend-url');
+        const pingResult = modal.querySelector('#backend-ping-result');
+        const btnPresetRender = modal.querySelector('#btn-preset-render');
+        const btnPresetLocal = modal.querySelector('#btn-preset-local');
+
+        const syncPresetHighlights = () => {
+          const normalized = ApiClient.normalizeBaseUrl(inputUrl.value);
+          const isRenderSelected = normalized === RENDER_PRESET_URL;
+          const isLocalSelected = normalized === LOCAL_PRESET_URL;
+
+          btnPresetRender.className = isRenderSelected
+            ? 'px-2.5 py-1 rounded-lg text-[10px] font-bold border bg-emerald-500/20 text-emerald-300 border-emerald-500/40 transition'
+            : 'px-2.5 py-1 rounded-lg text-[10px] font-bold border bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white transition';
+          btnPresetLocal.className = isLocalSelected
+            ? 'px-2.5 py-1 rounded-lg text-[10px] font-bold border bg-indigo-500/20 text-indigo-300 border-indigo-500/40 transition'
+            : 'px-2.5 py-1 rounded-lg text-[10px] font-bold border bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white transition';
+        };
+
+        const updateModalHealthView = (health, targetUrl, isChecking = false) => {
+          if (!modal.isConnected) return;
+          tiersContainer.innerHTML = this.renderArchitectureTiersHtml(health, targetUrl, isChecking);
+          modalDot.className = isChecking
+            ? 'w-3 h-3 rounded-full bg-indigo-400 animate-pulse'
+            : health?.isOnline
+              ? 'w-3 h-3 rounded-full bg-emerald-400 animate-pulse'
+              : 'w-3 h-3 rounded-full bg-amber-400';
+        };
+
+        syncPresetHighlights();
+        inputUrl.addEventListener('input', syncPresetHighlights);
+
+        let checkSeq = 0;
+
+        // Live-refresh current configured endpoint immediately on modal open
+        (async () => {
+          const seq = ++checkSeq;
+          const liveHealth = await ApiClient.checkHealth();
+          if (seq !== checkSeq || !modal.isConnected) return;
+          this.applyBackendHealthUI(liveHealth);
+          updateModalHealthView(liveHealth, ApiClient.getBaseUrl(), false);
+        })();
+
+        btnPresetRender.addEventListener('click', () => {
+          inputUrl.value = RENDER_PRESET_URL;
+          syncPresetHighlights();
+        });
+
+        btnPresetLocal.addEventListener('click', () => {
+          inputUrl.value = LOCAL_PRESET_URL;
+          syncPresetHighlights();
+        });
+
+        modal.querySelector('#btn-reset-backend-url').addEventListener('click', () => {
+          const defaultUrl = ApiClient.resetBaseUrl();
+          inputUrl.value = defaultUrl;
+          syncPresetHighlights();
+          pingResult.className = 'text-[11px] p-2.5 rounded-xl bg-slate-800 text-slate-300 block';
+          pingResult.textContent = `Reset to environment default: ${defaultUrl}`;
+        });
+
+        modal.querySelector('#btn-test-backend-ping').addEventListener('click', async () => {
+          const normalized = ApiClient.normalizeBaseUrl(inputUrl.value);
+          if (!normalized) {
+            pingResult.className = 'text-[11px] p-2.5 rounded-xl bg-red-950 border border-red-500/40 text-red-300 block';
+            pingResult.textContent = 'Please enter a valid backend URL before pinging.';
+            return;
+          }
+          inputUrl.value = normalized;
+          syncPresetHighlights();
+
+          const seq = ++checkSeq;
+          updateModalHealthView(this.lastHealth || { isOnline: false }, normalized, true);
+          pingResult.className = 'text-[11px] p-2.5 rounded-xl bg-slate-800 text-slate-300 block';
+          pingResult.textContent = `Pinging ${normalized}/health (up to 8s for Render cold starts)...`;
+
+          const health = await ApiClient.checkHealth(normalized);
+          if (seq !== checkSeq || !modal.isConnected) return;
+
+          updateModalHealthView(health, normalized, false);
+          if (health.isOnline) {
+            const meta = this.extractHealthMetadata(health, normalized);
+            pingResult.className = 'text-[11px] p-2.5 rounded-xl bg-emerald-950 border border-emerald-500/40 text-emerald-300 block';
+            pingResult.textContent = `✓ 200 OK (${health.latencyMs}ms) • ${meta.service} (${meta.hosting}) • DB: ${meta.database} [${meta.dbConnected ? 'Connected' : 'Disconnected'}]`;
+          } else {
+            pingResult.className = 'text-[11px] p-2.5 rounded-xl bg-red-950 border border-red-500/40 text-red-300 block';
+            pingResult.textContent = `Ping failed (${health.error || 'unreachable'}). If Render free tier is waking up, wait a few seconds and retry Test Ping.`;
+          }
+        });
+
+        modal.querySelector('#btn-save-backend-url').addEventListener('click', async () => {
+          const raw = inputUrl.value.trim();
+          if (!raw) {
+            ApiClient.resetBaseUrl();
+          } else {
+            const normalized = ApiClient.normalizeBaseUrl(raw);
+            if (normalized === ApiClient.getDefaultBaseUrl() && !(typeof window !== 'undefined' && window.APEX_API_URL)) {
+              ApiClient.resetBaseUrl();
+            } else {
+              ApiClient.setBaseUrl(normalized);
+            }
+          }
+          await this.checkBackendHealth();
+          close();
+        });
       }
 
       bindLegalEvents() {

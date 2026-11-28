@@ -1,150 +1,193 @@
 {
-  "system": "Project Apex Multi-Agent Framework",
-  "version": "1.0.0",
+  "system": "Project Apex Hierarchical Multi-Agent Framework",
+  "version": "3.0.0",
   "governance": "Spec Kitty Spec-Driven Development",
+  "hierarchy": {
+    "rootCoordinator": "apex-pm",
+    "totalAgents": 6,
+    "pattern": "apex-pm -> [apex-ba, apex-tech-lead -> [apex-ui, apex-java, apex-db]]"
+  },
+  "architecture": {
+    "model": "3-Tier Multi-Cloud Architecture",
+    "communication": "Firebase Hosting PWA <--HTTPS JSON / CORS + JWT--> Render Java 21 Spring Boot <--TLS/SSL JDBC Pool (HikariCP)--> Neon Serverless PostgreSQL",
+    "frontend": {
+      "tier": "Tier 1 - Presentation",
+      "platform": "Firebase Hosting",
+      "description": "Firebase Hosting",
+      "hostingUrl": "https://project-apex-pushp.web.app",
+      "stack": "BookMyShow / Snabbit Style PWA (HTML5, Tailwind CSS, ES Modules, Razorpay Standard Checkout)",
+      "ownerAgent": "apex-ui",
+      "entryArtifacts": [
+        "index.html",
+        "src/",
+        "src/services/apiClient.js",
+        "firebase.json",
+        "manifest.json",
+        "sw.js"
+      ]
+    },
+    "middleware": {
+      "tier": "Tier 2 - Application Middleware",
+      "platform": "Render Docker / Java 21 Spring Boot",
+      "description": "Render Docker / Java 21 Spring Boot",
+      "runtime": "Docker (eclipse-temurin:21-jre-jammy) + Java 21 LTS + Spring Boot 3.2.3",
+      "features": [
+        "Spring Security stateless JWT auth and strict Firebase Hosting CORS policy",
+        "Dual OTP KYC, dynamic off-peak/odd-hour paise pricing, Razorpay Orders & HMAC SHA-256 webhooks",
+        "Caffeine in-memory read caching and 60s BookingHoldExpiryScheduler"
+      ],
+      "ownerAgent": "apex-java",
+      "entryArtifacts": [
+        "backend/",
+        "backend/pom.xml",
+        "backend/Dockerfile",
+        "backend/src/main/java/com/projectapex/config/NeonDataSourceConfig.java",
+        "render.yaml"
+      ]
+    },
+    "database": {
+      "tier": "Tier 3 - Persistence & ACID Transactions",
+      "platform": "Neon Serverless PostgreSQL",
+      "description": "Neon Serverless PostgreSQL",
+      "engine": "PostgreSQL 15/16 (Neon) with H2 PostgreSQL compatibility fallback for local tests",
+      "pooler": "HikariCP SSL JDBC Pool (sslmode=require, maximumPoolSize=5)",
+      "features": [
+        "13-table relational schema (monetary amounts in BIGINT paise, timestamps in BIGINT epoch ms)",
+        "10-minute ACID slot hold locks enforced via UNIQUE (resource_id, booking_date, start_time) on apex_slot_locks",
+        "Idempotent Razorpay webhook deduplication in apex_webhook_events & immutable audit trail"
+      ],
+      "ownerAgent": "apex-db",
+      "entryArtifacts": [
+        "backend/src/main/resources/db/schema.sql",
+        "data-model.md",
+        "firestore.rules",
+        "firestore.indexes.json"
+      ]
+    }
+  },
   "constraints": {
     "zeroCloudFunctions": true,
     "sparkTierStrict": true,
     "maxDailyReads": 50000,
     "maxDailyWrites": 20000,
-    "targetJurisdiction": "India / Maharashtra (Mumbai, Thane, Navi Mumbai)"
+    "targetJurisdiction": "India / Maharashtra (Mumbai, Thane, Navi Mumbai)",
+    "neonAcidLocks": true,
+    "currencyPrecision": "BIGINT paise (1 INR = 100 paise)",
+    "holdTtlMinutes": 10,
+    "otpTtlSeconds": 300,
+    "timezone": "Asia/Kolkata"
   },
   "agents": {
     "apex-pm": {
       "name": "Project Manager & Spec Kitty Controller",
       "slug": "apex-pm",
-      "role": "Orchestration & Governance",
+      "role": "Top Coordinator — Orchestration, Governance & 3-Tier Delivery",
+      "tier": "Governance",
+      "reportsTo": null,
+      "directReports": ["apex-ba", "apex-tech-lead"],
       "duties": [
         "Enforce Spec Kitty SDD lifecycle (specify -> plan -> tasks -> implement)",
-        "Maintain kanban work package lanes (backlog, doing, review, done)",
-        "Audit compliance against Zero Cloud Functions and Spark Tier constraints",
-        "Generate multi-agent velocity and status reports"
+        "Coordinate deliverables across Business Analyst (apex-ba) and Technical Lead (apex-tech-lead)",
+        "Maintain kanban work package lanes (backlog, doing, review, done) and milestone status reports",
+        "Audit compliance against Zero Cloud Functions, Spark Tier quotas, and 3-tier Firebase/Render/Neon mandates"
       ],
       "artifacts": ["spec.md", "plan.md", "tasks.md", "kanban.json"]
     },
     "apex-ba": {
       "name": "Business Analyst",
       "slug": "apex-ba",
-      "role": "Domain Requirements & Analysis",
+      "role": "Market Research, BRD/PRD & BA-01..BA-08 Rules",
+      "tier": "Requirements & Domain",
+      "reportsTo": "apex-pm",
+      "directReports": [],
       "duties": [
-        "Document player and venue owner user stories and PRDs",
-        "Formulate dynamic off-peak and odd-hour discount schedules",
-        "Define 3-tier cancellation and refund policy matrices",
-        "Define Given-When-Then acceptance criteria"
+        "Conduct Indian sports-tech market research across Mumbai, Thane, and Navi Mumbai (Playo, Hudle, Turf Town benchmarking)",
+        "Author and govern Business Requirements Document (docs/brd.md), PRD (docs/prd.md), and Feature Spec (spec.md)",
+        "Define and enforce BA-01 through BA-08 business rules (Dual OTP KYC, Owner Onboarding, Dynamic Pricing, 10-min ACID Hold, Razorpay Webhooks, 3-Tier Cancellation, Gate QR, Cloud SLA)",
+        "Specify Given-When-Then acceptance criteria and traceability matrices"
       ],
-      "artifacts": ["docs/prd.md", "spec.md"]
+      "artifacts": ["docs/brd.md", "docs/prd.md", "spec.md"]
     },
-    "apex-database": {
-      "name": "Database Expert",
-      "slug": "apex-database",
-      "role": "Data Architecture & Security Rules",
+    "apex-tech-lead": {
+      "name": "Technical Lead",
+      "slug": "apex-tech-lead",
+      "role": "3-Tier Architecture, API Contracts & Cross-Team Integration",
+      "tier": "Cross-Tier Architecture",
+      "reportsTo": "apex-pm",
+      "directReports": ["apex-ui", "apex-java", "apex-db"],
       "duties": [
-        "Maintain 8-collection Firestore schema optimized for Spark Free Tier",
-        "Enforce 1-read-per-court-per-day consolidated daily availability docs",
-        "Write and validate fail-safe firestore.rules",
-        "Configure composite query indexes in firestore.indexes.json"
-      ],
-      "artifacts": ["firestore.rules", "firestore.indexes.json", "data-model.md"]
-    },
-    "apex-backend": {
-      "name": "Backend Engineer",
-      "slug": "apex-backend",
-      "role": "Atomic Transactions & Core Services",
-      "duties": [
-        "Implement client-side check-and-set concurrency locks with 5-minute TTL",
-        "Implement multi-document atomic commit transactions via runTransaction",
-        "Build dynamic pricing and promo discount engine",
-        "Build payment gateway integration and QR pass generator"
+        "Own end-to-end 3-tier integration across Firebase Hosting, Render Java 21 middleware, and Neon Serverless PostgreSQL",
+        "Govern REST API contracts (/api/v1/*), JWT RBAC boundaries, CORS policies, and Razorpay webhook contracts",
+        "Coordinate apex-ui, apex-java, and apex-db on schema alignment, paise ledger precision, and ACID concurrency",
+        "Validate multi-tier resilience, cold-start behavior, and end-to-end acceptance workflows"
       ],
       "artifacts": [
-        "src/services/concurrencyService.js",
-        "src/services/bookingService.js",
-        "src/services/pricingEngine.js",
-        "src/services/paymentService.js",
-        "src/services/cancellationService.js"
+        "docs/technical-spec-java-backend-architecture.md",
+        "docs/workflows/comprehensive-call-workflows.md",
+        "plan.md"
       ]
     },
-    "apex-frontend": {
-      "name": "Frontend / UI Expert",
-      "slug": "apex-frontend",
-      "role": "UI/UX & Interactive Components",
+    "apex-ui": {
+      "name": "UI Expert",
+      "slug": "apex-ui",
+      "role": "Tier 1 — BookMyShow/Snabbit PWA on Firebase Hosting",
+      "tier": "Tier 1: Frontend (Firebase Hosting)",
+      "reportsTo": "apex-tech-lead",
+      "directReports": [],
       "duties": [
-        "Build responsive Venue Explorer with Thane/Mumbai city filtering",
-        "Create real-time interactive Slot Grid with odd-hour discount badges",
-        "Build frictionless checkout modal with 5-minute reservation timer",
-        "Build Player Portal ('My Bookings') and Venue Owner Management Portal"
+        "Build and maintain BookMyShow & Snabbit styled responsive Web/PWA UI on Firebase Hosting",
+        "Implement Venue Explorer, interactive Slot Grid with odd-hour badges, Checkout countdown modal, Player Portal, and Owner Gate Portal",
+        "Integrate Tier 2 Render REST endpoints via src/services/apiClient.js and Razorpay Standard Checkout",
+        "Maintain Firebase Hosting routing (firebase.json), PWA manifest.json, and offline service worker sw.js"
       ],
       "artifacts": [
         "index.html",
-        "src/components/VenueExplorer.js",
-        "src/components/SlotCalendar.js",
-        "src/components/CheckoutModal.js",
-        "src/components/BookingConfirmation.js",
-        "src/components/PlayerPortal.js",
-        "src/components/VenueOwnerPortal.js",
-        "src/components/AdminConsole.js"
-      ]
-    },
-    "apex-mobile": {
-      "name": "Mobile App Expert",
-      "slug": "apex-mobile",
-      "role": "PWA & Offline Resilience",
-      "duties": [
-        "Configure PWA manifest.json with mobile install banners",
-        "Implement service worker sw.js for offline asset caching",
-        "Implement IndexedDB storage for venue catalogs and QR passes",
-        "Optimize touch targets and mobile viewport rendering"
-      ],
-      "artifacts": ["public/manifest.json", "public/sw.js", "src/services/offlineStorage.js"]
-    },
-    "apex-marketing": {
-      "name": "Marketing Expert",
-      "slug": "apex-marketing",
-      "role": "Growth & Monetization",
-      "duties": [
-        "Design Thane and Mumbai urban expansion and tournament playbooks",
-        "Create odd-hour and off-peak promotional discount campaigns",
-        "Design player referral loops and loyalty tiers",
-        "Draft automated SMS/Push notification re-engagement templates"
-      ],
-      "artifacts": [
-        "docs/marketing/thane-mumbai-growth-strategy.md",
-        "docs/marketing/off-peak-demand-playbook.md",
-        "docs/marketing/loyalty-and-referral-program.md"
-      ]
-    },
-    "apex-legal": {
-      "name": "Legal Compliance Expert",
-      "slug": "apex-legal",
-      "role": "Legal & Risk Mitigation",
-      "duties": [
-        "Draft Terms of Service under IT Act 2000 Section 79",
-        "Draft DPDP Act 2023 compliant User Privacy Policy",
-        "Draft physical sporting injury & property damage liability waivers",
-        "Draft Venue Partner Agreement for facility owners in Maharashtra"
-      ],
-      "artifacts": [
-        "docs/legal/terms-of-service.md",
-        "docs/legal/privacy-policy.md",
-        "docs/legal/injury-liability-waiver.md",
-        "docs/legal/vendor-partner-agreement.md"
-      ]
-    },
-    "apex-deployment": {
-      "name": "Deployment Engineer",
-      "slug": "apex-deployment",
-      "role": "CI/CD & Quota Monitoring",
-      "duties": [
-        "Configure Firebase Hosting, Firestore Rules, and Indexes",
-        "Establish 50,000 daily read threshold monitoring calculations",
-        "Implement pre-flight Zero Cloud Functions audit CLI",
-        "Execute automated deployment to Firebase Spark tier"
-      ],
-      "artifacts": [
+        "src/",
+        "src/services/apiClient.js",
         "firebase.json",
-        ".firebaserc",
-        "docs/deployment/spark-tier-quota-budget.md",
-        "docs/deployment/deployment-guide.md"
+        "manifest.json",
+        "sw.js"
+      ]
+    },
+    "apex-java": {
+      "name": "Java Developer",
+      "slug": "apex-java",
+      "role": "Tier 2 — Java 21 Spring Boot Middleware on Render",
+      "tier": "Tier 2: Middleware (Render Docker / Java 21 Spring Boot)",
+      "reportsTo": "apex-tech-lead",
+      "directReports": [],
+      "duties": [
+        "Implement Java 21 LTS + Spring Boot 3.2.x REST middleware containerized for Render deployment",
+        "Enforce Spring Security JWT auth, Dual OTP KYC, dynamic pricing in integer paise, and Razorpay HMAC SHA-256 verification",
+        "Configure NeonDataSourceConfig HikariCP SSL pooling, Caffeine caching, and 60s BookingHoldExpiryScheduler",
+        "Maintain Render deployment blueprint (render.yaml) and multi-stage backend/Dockerfile"
+      ],
+      "artifacts": [
+        "backend/",
+        "backend/pom.xml",
+        "backend/Dockerfile",
+        "backend/src/main/java/com/projectapex/config/NeonDataSourceConfig.java",
+        "render.yaml"
+      ]
+    },
+    "apex-db": {
+      "name": "Database Expert",
+      "slug": "apex-db",
+      "role": "Tier 3 — Neon Serverless PostgreSQL Schema & ACID Locks",
+      "tier": "Tier 3: Database (Neon Serverless PostgreSQL)",
+      "reportsTo": "apex-tech-lead",
+      "directReports": [],
+      "duties": [
+        "Own 13-table Neon Serverless PostgreSQL schema with H2 PostgreSQL compatibility in backend/src/main/resources/db/schema.sql",
+        "Enforce ACID double-booking prevention via UNIQUE (resource_id, booking_date, start_time) on apex_slot_locks",
+        "Guarantee BIGINT integer paise financial precision, UTC epoch timestamps, and webhook idempotency keys",
+        "Maintain data-model.md specifications and legacy Firestore security rules/indexes during transition"
+      ],
+      "artifacts": [
+        "backend/src/main/resources/db/schema.sql",
+        "data-model.md",
+        "firestore.rules",
+        "firestore.indexes.json"
       ]
     }
   }

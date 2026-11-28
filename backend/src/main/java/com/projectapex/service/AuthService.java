@@ -129,6 +129,7 @@ public class AuthService {
         if (req.getCity() != null) user.setCity(req.getCity());
         if (req.getPreferredSports() != null) user.setPreferredSports(req.getPreferredSports());
         user.setUpdatedAt(System.currentTimeMillis());
+        firebaseService.persistUser(user);
         return user;
     }
 

@@ -32,6 +32,7 @@ public class ConcurrencyService {
             }
             // Same user renewing their lock
             existing.setExpiresAt(now + (lockTtlSeconds * 1000));
+            firebaseService.persistConcurrencyLock(existing);
             return existing;
         }
 
@@ -46,6 +47,7 @@ public class ConcurrencyService {
         ConcurrencyLock lock = firebaseService.getConcurrencyLocks().get(lockKey);
         if (lock != null && lock.getUserId().equals(userId) && "HELD".equals(lock.getStatus())) {
             lock.setStatus("RELEASED");
+            firebaseService.releaseConcurrencyLock(lock);
         }
     }
 }

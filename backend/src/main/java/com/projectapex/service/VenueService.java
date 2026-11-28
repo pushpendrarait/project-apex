@@ -126,6 +126,7 @@ public class VenueService {
             v.setCancellationPolicy(req.getCancellationPolicy());
         }
         v.setUpdatedAt(System.currentTimeMillis());
+        firebaseService.persistVenue(v);
         return v;
     }
 
@@ -159,6 +160,8 @@ public class VenueService {
         Set<String> sportsSet = new HashSet<>(venue.getSportTypes());
         sportsSet.addAll(req.getSportTypes());
         venue.setSportTypes(new ArrayList<>(sportsSet));
+        venue.setUpdatedAt(System.currentTimeMillis());
+        firebaseService.persistVenue(venue);
 
         return r;
     }
@@ -182,6 +185,7 @@ public class VenueService {
         r.setSurfaceType(req.getSurfaceType());
         r.setIndoor(req.isIndoor());
         r.setUpdatedAt(System.currentTimeMillis());
+        firebaseService.persistResource(r);
         return r;
     }
 

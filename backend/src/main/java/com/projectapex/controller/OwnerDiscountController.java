@@ -92,6 +92,7 @@ public class OwnerDiscountController {
         if (req.getValue() > 0) d.setValue(req.getValue());
         if (req.getMaxDiscountPaise() > 0) d.setMaxDiscountPaise(req.getMaxDiscountPaise());
         if (req.getMinOrderPaise() > 0) d.setMinOrderPaise(req.getMinOrderPaise());
+        firebaseService.persistDiscount(d);
 
         return ResponseEntity.ok(ApiResponse.ok("Discount updated", d));
     }
@@ -111,6 +112,7 @@ public class OwnerDiscountController {
         }
 
         d.setActive(!d.isActive());
+        firebaseService.persistDiscount(d);
         return ResponseEntity.ok(ApiResponse.ok("Discount status updated", d));
     }
 }
