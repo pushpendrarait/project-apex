@@ -37,7 +37,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/slots/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/webhooks/razorpay").permitAll()
                         .requestMatchers("/api/v1/health", "/actuator/**", "/error").permitAll()
-                        .requestMatchers("/api/v1/owner/**").hasAnyRole("OWNER", "ADMIN")
+                        .requestMatchers("/api/v1/owner/**", "/api/v1/gate/**", "/api/v1/facilities/**").hasAnyRole("OWNER", "ADMIN")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )

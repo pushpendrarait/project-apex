@@ -6,8 +6,172 @@
 import { mockDb } from './firebaseConfig.js';
 import { ConcurrencyService } from './concurrencyService.js';
 import { PaymentService } from './paymentService.js';
+import { ApiClient } from './apiClient.js';
 
 export class BookingService {
+  static normalizeBackendBooking(b) {
+    if (!b || !b.bookingId) return null;
+    const firstSlot = Array.isArray(b.slots) && b.slots.length > 0 ? b.slots[0].startTime : (b.slot || '18:00');
+    const totalRupees = b.finalPayablePaise != null ? Math.round(b.finalPayablePaise / 100) : (b.pricing?.total || 1000);
+    const refundRupees = b.refundAmountPaise != null ? Math.round(b.refundAmountPaise / 100) : null;
+    return {
+      bookingId: b.bookingId,
+      bookingCode: b.bookingCode,
+      userId: b.userId,
+      userName: b.userName || 'Apex Player',
+      userPhone: b.userPhone || '+91 98201 12345',
+      ownerId: b.ownerId,
+      venueId: b.venueId,
+      venueName: b.venueName || 'Apex Sports Arena',
+      courtId: b.resourceId || b.courtId,
+      courtName: b.resourceName || b.courtName || 'Main Pitch',
+      sport: (b.sportType || b.sport || 'cricket').toLowerCase(),
+      date: b.bookingDate || b.date,
+      slot: firstSlot,
+      durationMinutes: 60,
+      pricing: b.pricing || {
+        baseRate: b.subtotalPaise ? Math.round(b.subtotalPaise / 100) : totalRupees,
+        total: totalRupees,
+        isOddHour: false
+      },
+      payment: b.payment || {
+        paymentId: b.razorpayPaymentId || `pay_${b.bookingId}`,
+        razorpayOrderId: b.razorpayOrderId || null,
+        method: String(b.bookingCode || '').includes('WALKIN') ? 'CASH' : 'UPI',
+        amount: totalRupees,
+        status: 'SUCCESS'
+      },
+      qrPassToken: b.qrPassToken || (`APEX-PASS-${b.bookingCode || b.bookingId}`),
+      status: b.status || 'CONFIRMED',
+      source: String(b.bookingCode || '').includes('WALKIN') ? 'walk_in' : 'online',
+      refundDetails: refundRupees != null ? { refundAmount: refundRupees } : null,
+      notes: b.notes || null,
+      checkedInAt: b.checkedInAt || null,
+      createdAt: b.createdAt || Date.now(),
+      backendSynced: true
+    };
+  }
+
+  static async syncMyBookingsFromBackend() {
+    if (typeof window === 'undefined' || !ApiClient.getToken()) return [];
+    try {
+      const res = await ApiClient.getMyPasses();
+      if (res && Array.isArray(res.data)) {
+        const syncedIds = new Set();
+        const mapped = [];
+        res.data.forEach(raw => {
+          const nb = this.normalizeBackendBooking(raw);
+          if (nb) {
+            syncedIds.add(nb.bookingId);
+            mockDb.data.bookings[nb.bookingId] = nb;
+            mapped.push(nb);
+          }
+        });
+        Object.keys(mockDb.data.bookings).forEach(id => {
+          if (mockDb.data.bookings[id].backendSynced && !syncedIds.has(id)) {
+            delete mockDb.data.bookings[id];
+          }
+        });
+        mockDb.persist();
+        return mapped;
+      }
+    } catch (e) {
+      console.warn('[BookingService] syncMyBookingsFromBackend warning:', e.message);
+    }
+    return [];
+  }
+
+  static async syncOwnerBookingsFromBackend() {
+    if (typeof window === 'undefined' || !ApiClient.getToken()) return [];
+    try {
+      const res = await ApiClient.getOwnerBookings();
+      if (res && Array.isArray(res.data)) {
+        res.data.forEach(raw => {
+          const nb = this.normalizeBackendBooking(raw);
+          if (nb) {
+            mockDb.data.bookings[nb.bookingId] = nb;
+          }
+        });
+        mockDb.persist();
+        return res.data;
+      }
+    } catch (e) {
+      console.warn('[BookingService] syncOwnerBookingsFromBackend warning:', e.message);
+    }
+    return [];
+  }
+
+  static async updateBookingAndSync(bookingId, { bookingDate, slotTime, userPhone, notes }) {
+    const existing = mockDb.data.bookings[bookingId];
+    if (typeof window !== 'undefined' && ApiClient.getToken()) {
+      const res = await ApiClient.updateBooking(bookingId, { bookingDate, slotTime, userPhone, notes });
+      if (res && res.data) {
+        const updated = this.normalizeBackendBooking(res.data);
+        if (existing) {
+          const oldAvailKey = `${existing.courtId}_${existing.date}`;
+          if (mockDb.data.availability[oldAvailKey]?.slots?.[existing.slot]) {
+            mockDb.data.availability[oldAvailKey].slots[existing.slot].status = 'AVAILABLE';
+          }
+        }
+        mockDb.data.bookings[bookingId] = updated;
+        mockDb.persist();
+        return { success: true, booking: updated };
+      }
+    }
+    if (!existing) throw new Error('Booking not found');
+    if (bookingDate) existing.date = bookingDate;
+    if (slotTime) existing.slot = slotTime;
+    if (userPhone) existing.userPhone = userPhone;
+    if (notes !== undefined) existing.notes = notes;
+    mockDb.persist();
+    return { success: true, booking: existing };
+  }
+
+  static async deleteBookingAndSync(bookingId) {
+    const existing = mockDb.data.bookings[bookingId];
+    if (typeof window !== 'undefined' && ApiClient.getToken()) {
+      await ApiClient.deleteBooking(bookingId);
+    }
+    if (existing) {
+      const availKey = `${existing.courtId}_${existing.date}`;
+      if (mockDb.data.availability[availKey]?.slots?.[existing.slot]) {
+        mockDb.data.availability[availKey].slots[existing.slot].status = 'AVAILABLE';
+        delete mockDb.data.availability[availKey].slots[existing.slot].bookingId;
+      }
+      const lockKey = ConcurrencyService.getLockKey(existing.courtId, existing.date, existing.slot);
+      delete mockDb.data.concurrency_locks[lockKey];
+      delete mockDb.data.bookings[bookingId];
+      mockDb.persist();
+      return true;
+    }
+    return false;
+  }
+
+  static async checkInPlayerAndSync(qrPassToken, actorId = 'gate_staff') {
+    if (typeof window !== 'undefined' && ApiClient.getToken()) {
+      const res = await ApiClient.verifyGatePass(qrPassToken);
+      if (res && res.data) {
+        if (res.data.booking) {
+          const nb = this.normalizeBackendBooking(res.data.booking);
+          if (nb) {
+            mockDb.data.bookings[nb.bookingId] = nb;
+            mockDb.persist();
+          }
+          return {
+            success: !!res.data.valid,
+            alreadyCheckedIn: !!res.data.alreadyCheckedIn,
+            message: res.data.message || 'Pass processed',
+            booking: nb
+          };
+        }
+        if (res.data.valid === false && !res.data.alreadyCheckedIn) {
+          throw new Error(res.data.message || 'Invalid QR Pass Token');
+        }
+      }
+    }
+    return this.checkInPlayer(qrPassToken, actorId);
+  }
+
   /**
    * Phase 3: Atomic Multi-Document Booking Commit
    * In Firestore, this executes inside `runTransaction(db, async (transaction) => ...)`
@@ -43,10 +207,53 @@ export class BookingService {
     }
 
     if (lock.expiresAt < now) {
-      throw new Error("Reservation window (5 minutes) timed out. Please select the slot again.");
+      throw new Error("Reservation window timed out. Please select the slot again.");
     }
 
-    // 2. Process simulated payment or verify gateway payment
+    // 2. If running in live authenticated browser, commit through Render Java Middleware -> Neon PostgreSQL
+    if (typeof window !== 'undefined' && ApiClient.getToken()) {
+      const rzpOrder = razorpayOrderId || `order_web_${now}`;
+      const rzpPay = razorpayPaymentId || `pay_web_${now}`;
+      const rzpSig = razorpaySignature || 'SIMULATED_TEST_SIGNATURE';
+      const commitRes = await ApiClient.commitBooking({
+        courtId,
+        date,
+        slot,
+        razorpayOrderId: rzpOrder,
+        razorpayPaymentId: rzpPay,
+        razorpaySignature: rzpSig,
+        paymentMethod
+      });
+      if (commitRes && commitRes.data && commitRes.data.bookingId) {
+        const syncedBooking = this.normalizeBackendBooking({
+          ...commitRes.data,
+          venueName: venueName || commitRes.data.venueName,
+          resourceName: courtName || commitRes.data.resourceName
+        });
+        syncedBooking.pricing = pricing;
+
+        const availKey = `${courtId}_${date}`;
+        if (!mockDb.data.availability[availKey]) {
+          mockDb.data.availability[availKey] = { courtId, venueId, date, slots: {}, lastUpdated: now };
+        }
+        mockDb.data.availability[availKey].slots[slot] = {
+          ...(mockDb.data.availability[availKey].slots[slot] || { slotTime: slot, basePrice: pricing.baseRate }),
+          status: 'BOOKED',
+          bookingId: syncedBooking.bookingId,
+          userId
+        };
+        mockDb.data.concurrency_locks[lockKey].status = 'COMMITTED';
+        mockDb.data.concurrency_locks[lockKey].bookingId = syncedBooking.bookingId;
+        mockDb.data.bookings[syncedBooking.bookingId] = syncedBooking;
+        if (mockDb.data.users[userId]) {
+          mockDb.data.users[userId].loyaltyPoints = (mockDb.data.users[userId].loyaltyPoints || 0) + 50;
+        }
+        mockDb.persist();
+        return { success: true, booking: syncedBooking };
+      }
+    }
+
+    // 2b. Process simulated payment (Node / offline fallback)
     const paymentResult = await PaymentService.processPayment({
       amount: pricing.total,
       method: paymentMethod
@@ -551,6 +758,35 @@ export class BookingService {
     const targetSlot = dailyDoc.slots[slot];
     if (targetSlot && (targetSlot.status === 'BOOKED' || targetSlot.status === 'MAINTENANCE')) {
       throw new Error(`Slot ${slot} on ${date} is already booked.`);
+    }
+
+    if (typeof window !== 'undefined' && ApiClient.getToken() && !isMaintenance) {
+      const res = await ApiClient.createWalkInBooking({
+        courtId,
+        date,
+        slot,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        amountCollected: Number(finalAmount) || 1000
+      });
+      if (res && res.data && res.data.bookingId) {
+        const synced = this.normalizeBackendBooking({
+          ...res.data,
+          venueName: venueName || res.data.venueName,
+          resourceName: courtName || res.data.resourceName
+        });
+        synced.source = 'walk_in';
+        dailyDoc.slots[slot] = {
+          ...(dailyDoc.slots[slot] || { slotTime: slot, basePrice: finalAmount, currentPrice: finalAmount }),
+          status: 'BOOKED',
+          bookingId: synced.bookingId,
+          userId: synced.userId
+        };
+        dailyDoc.lastUpdated = Date.now();
+        mockDb.data.bookings[synced.bookingId] = synced;
+        mockDb.persist();
+        return { success: true, booking: synced };
+      }
     }
 
     const now = Date.now();

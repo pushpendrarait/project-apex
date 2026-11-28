@@ -90,8 +90,8 @@ export class UserAuthModal {
                 <div>
                   <div class="font-bold text-white text-sm flex items-center gap-1.5">
                     <span>${currentUser.displayName}</span>
-                    <span class="text-[9px] uppercase px-1.5 py-0.2 rounded font-mono ${currentUser.role === 'venue_owner' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'}">
-                      ${currentUser.role === 'venue_owner' ? 'Facility Owner' : 'Player'}
+                    <span class="text-[9px] uppercase px-1.5 py-0.2 rounded font-mono ${ApiClient.isOwnerRole(currentUser.role) ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'}">
+                      ${ApiClient.isOwnerRole(currentUser.role) ? 'Facility Owner' : 'Player'}
                     </span>
                   </div>
                   <div class="text-[11px] text-slate-400">${currentUser.phone || ''} • ${currentUser.email || ''}</div>
@@ -605,7 +605,7 @@ export class UserAuthModal {
         setTimeout(() => {
           close();
           if (onUserChanged) onUserChanged(result.user);
-          if (result.user.role === 'venue_owner' && onNavigate) {
+          if (ApiClient.isOwnerRole(result.user.role) && onNavigate) {
             onNavigate('partner');
           } else if (onNavigate) {
             onNavigate('bookings');
@@ -941,7 +941,7 @@ export class UserAuthModal {
         setTimeout(() => {
           close();
           if (onUserChanged) onUserChanged(res.user);
-          if (res.user.role === 'venue_owner' && onNavigate) {
+          if (ApiClient.isOwnerRole(res.user.role) && onNavigate) {
             onNavigate('partner');
           } else if (onNavigate) {
             onNavigate('bookings');

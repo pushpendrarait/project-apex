@@ -294,6 +294,10 @@ export class OtpService {
       throw new Error("Login OTP expired. Please request a new code.");
     }
 
+    if ((session.attemptsRemaining ?? 3) <= 0) {
+      throw new Error("Maximum invalid login OTP attempts exceeded. Please request a fresh OTP.");
+    }
+
     if (String(otp).trim() !== session.otp) {
       session.attemptsRemaining -= 1;
       mockDb.persist();

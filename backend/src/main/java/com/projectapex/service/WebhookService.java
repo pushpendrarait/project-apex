@@ -105,9 +105,17 @@ public class WebhookService {
                 booking.setStatus("CONFLICT_REFUND_PENDING");
                 String refundId = razorpayService.refundPayment(paymentId, booking.getFinalPayablePaise(), "Late payment after hold expiry conflict");
                 booking.setRefundId(refundId);
+                booking.setRefundAmountPaise(booking.getFinalPayablePaise());
                 booking.setRefundStatus("INITIATED");
                 booking.setUpdatedAt(now);
                 firebaseService.persistBooking(booking);
+
+                PaymentRecord refundPayment = new PaymentRecord(
+                        "pay_ref_" + UUID.randomUUID().toString().substring(0, 8),
+                        bookingId, booking.getUserId(), booking.getOwnerId(),
+                        orderId, paymentId, booking.getFinalPayablePaise());
+                refundPayment.setStatus("REFUND_INITIATED");
+                firebaseService.getPayments().put(refundPayment.getPaymentId(), refundPayment);
                 return;
             }
         }

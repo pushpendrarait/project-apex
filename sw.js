@@ -3,7 +3,7 @@
  * Network-First with Cache Fallback for Offline Ticket Pass Resilience
  */
 
-const CACHE_NAME = 'project-apex-v3.0.0';
+const CACHE_NAME = 'project-apex-v3.1.0';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

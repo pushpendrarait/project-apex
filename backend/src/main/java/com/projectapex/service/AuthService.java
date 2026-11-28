@@ -109,7 +109,11 @@ public class AuthService {
         firebaseService.getResources().put(res.getResourceId(), res);
         firebaseService.getScheduleRules().put(res.getResourceId(), new ScheduleRuleRecord(res.getResourceId(), venue.getVenueId(), uid));
 
+        user.setVenueId(venue.getVenueId());
         firebaseService.getUsers().put(uid, user);
+        firebaseService.getAuditLogs().add(new AuditLog(
+                "audit_usr_" + now, "USER_CREATED", uid, "user", uid,
+                Map.of("role", "ROLE_OWNER", "venueId", venue.getVenueId())));
         String token = jwtService.generateToken(user.getUid(), "ROLE_OWNER", user.getFullName(), user.getPhone(), user.getEmail());
         return new AuthResponse(token, user);
     }
@@ -159,31 +163,47 @@ public class AuthService {
 
         if ("venue_owner".equalsIgnoreCase(req.getRole())) {
             String facilityName = req.getFacilityName() != null && !req.getFacilityName().trim().isEmpty()
-                    ? req.getFacilityName()
+                    ? req.getFacilityName().trim()
                     : req.getDisplayName() + "'s Sports Arena";
 
-            VenueRecord venue = new VenueRecord("venue_" + nameSlug + "_" + (100 + (int)(Math.random() * 900)),
+            int rateInr = req.getStartingPrice() != null && req.getStartingPrice() >= 200 ? req.getStartingPrice() : 1200;
+            String venueId = "venue_" + nameSlug + "_" + (100 + (int)(Math.random() * 900));
+            VenueRecord venue = new VenueRecord(venueId,
                     uid, facilityName, req.getArea() != null ? req.getArea() : "Central Area", req.getCity() != null ? req.getCity() : "thane");
+            venue.setMinSlotPricePaise((long) rateInr * 100L);
+            if (req.getSports() != null && !req.getSports().isEmpty()) {
+                venue.setSportTypes(req.getSports());
+            }
             firebaseService.getVenues().put(venue.getVenueId(), venue);
 
+            String primarySport = (req.getSports() != null && !req.getSports().isEmpty()) ? req.getSports().get(0).toLowerCase() : "cricket";
             FacilityRecord defaultCourt = new FacilityRecord();
             defaultCourt.setCourtId("court_" + venue.getVenueId() + "_01");
             defaultCourt.setVenueId(venue.getVenueId());
             defaultCourt.setName("Main Arena Pitch 1");
-            defaultCourt.setSport("cricket");
-            defaultCourt.setBaseHourlyRate(1200);
-            defaultCourt.setPeakHourlyRate(1600);
+            defaultCourt.setSport(primarySport);
+            defaultCourt.setBaseHourlyRate(rateInr);
+            defaultCourt.setPeakHourlyRate((int) Math.round(rateInr * 1.3));
             defaultCourt.setOddHourDiscountPct(35);
             defaultCourt.setHasFloodlights(true);
             defaultCourt.setStatus("ACTIVE");
             defaultCourt.setCreatedAt(now);
             firebaseService.getCourts().put(defaultCourt.getCourtId(), defaultCourt);
             venueService.getDailyAvailability(defaultCourt.getCourtId(), "2026-11-28");
+
+            ResourceRecord res = new ResourceRecord("res_" + venue.getVenueId() + "_01", venue.getVenueId(), uid,
+                    defaultCourt.getName(), List.of(primarySport.toUpperCase()), (long) rateInr * 100L);
+            firebaseService.getResources().put(res.getResourceId(), res);
+            firebaseService.getScheduleRules().put(res.getResourceId(), new ScheduleRuleRecord(res.getResourceId(), venue.getVenueId(), uid));
+            user.setVenueId(venue.getVenueId());
         } else {
             user.setLoyaltyPoints(100);
         }
 
         firebaseService.getUsers().put(uid, user);
+        firebaseService.getAuditLogs().add(new AuditLog(
+                "audit_usr_" + now, "USER_CREATED", uid, "user", uid,
+                Map.of("role", user.getRole(), "city", user.getCity())));
         String token = jwtService.generateToken(user.getUid(), user.getRole(), user.getFullName(), user.getPhone(), user.getEmail());
         return new AuthResponse(token, user);
     }
@@ -255,13 +275,24 @@ public class AuthService {
             throw new IllegalArgumentException("Password must be at least 6 characters");
         }
 
+        String cleanEmail = req.getEmail().trim().toLowerCase();
+        String cleanDigits = req.getPhone().replaceAll("[^0-9]", "");
+        boolean duplicate = firebaseService.getUsers().values().stream().anyMatch(u ->
+                (u.getEmail() != null && u.getEmail().trim().equalsIgnoreCase(cleanEmail)) ||
+                (cleanDigits.length() >= 10 && u.getPhone() != null
+                        && u.getPhone().replaceAll("[^0-9]", "").endsWith(cleanDigits.substring(cleanDigits.length() - 10)))
+        );
+        if (duplicate) {
+            throw new IllegalArgumentException("An account is already registered with this email or mobile number. Please sign in instead.");
+        }
+
         long now = System.currentTimeMillis();
         String nameSlug = req.getDisplayName().toLowerCase().replaceAll("[^a-z0-9]", "_");
         String uid = "usr_" + nameSlug + "_" + (1000 + (int)(Math.random() * 9000));
 
         UserRecord user = new UserRecord(
                 uid,
-                req.getEmail().trim().toLowerCase(),
+                cleanEmail,
                 req.getDisplayName().trim(),
                 req.getPhone().trim(),
                 req.getRole() != null ? req.getRole() : "ROLE_PLAYER"
@@ -271,32 +302,51 @@ public class AuthService {
         user.setPhoneVerified(true);
         user.setEmailVerified(true);
 
-        if ("venue_owner".equalsIgnoreCase(req.getRole())) {
+        if ("venue_owner".equalsIgnoreCase(req.getRole()) || "ROLE_OWNER".equalsIgnoreCase(req.getRole())) {
             String facilityName = req.getFacilityName() != null && !req.getFacilityName().trim().isEmpty()
                     ? req.getFacilityName().trim()
                     : req.getDisplayName() + "'s Sports Arena";
 
-            VenueRecord venue = new VenueRecord("venue_" + nameSlug + "_" + (100 + (int)(Math.random() * 900)),
+            int rateInr = req.getStartingPrice() != null && req.getStartingPrice() >= 200 ? req.getStartingPrice() : 1200;
+            String venueId = "venue_" + nameSlug + "_" + (100 + (int)(Math.random() * 900));
+            VenueRecord venue = new VenueRecord(venueId,
                     uid, facilityName, req.getArea() != null ? req.getArea() : "Central Area", req.getCity() != null ? req.getCity() : "thane");
+            venue.setMinSlotPricePaise((long) rateInr * 100L);
+            if (req.getSports() != null && !req.getSports().isEmpty()) {
+                venue.setSportTypes(req.getSports());
+            }
             firebaseService.getVenues().put(venue.getVenueId(), venue);
 
+            String primarySport = (req.getSports() != null && !req.getSports().isEmpty()) ? req.getSports().get(0).toLowerCase() : "cricket";
             FacilityRecord defaultCourt = new FacilityRecord();
             defaultCourt.setCourtId("court_" + venue.getVenueId() + "_01");
             defaultCourt.setVenueId(venue.getVenueId());
             defaultCourt.setName("Main Arena Pitch 1");
-            defaultCourt.setSport("cricket");
-            defaultCourt.setBaseHourlyRate(1200);
-            defaultCourt.setPeakHourlyRate(1600);
+            defaultCourt.setSport(primarySport);
+            defaultCourt.setBaseHourlyRate(rateInr);
+            defaultCourt.setPeakHourlyRate((int) Math.round(rateInr * 1.3));
             defaultCourt.setOddHourDiscountPct(35);
             defaultCourt.setHasFloodlights(true);
             defaultCourt.setStatus("ACTIVE");
             defaultCourt.setCreatedAt(now);
             firebaseService.getCourts().put(defaultCourt.getCourtId(), defaultCourt);
+
+            ResourceRecord res = new ResourceRecord("res_" + venue.getVenueId() + "_01", venue.getVenueId(), uid,
+                    defaultCourt.getName(), List.of(primarySport.toUpperCase()), (long) rateInr * 100L);
+            firebaseService.getResources().put(res.getResourceId(), res);
+            firebaseService.getScheduleRules().put(res.getResourceId(), new ScheduleRuleRecord(res.getResourceId(), venue.getVenueId(), uid));
+
+            OwnerProfile op = new OwnerProfile(facilityName, req.getArea() != null ? req.getArea() : req.getCity(), null, null);
+            user.setOwnerProfile(op);
+            user.setVenueId(venue.getVenueId());
         } else {
             user.setLoyaltyPoints(100);
         }
 
         firebaseService.getUsers().put(uid, user);
+        firebaseService.getAuditLogs().add(new AuditLog(
+                "audit_usr_" + now, "USER_CREATED", uid, "user", uid,
+                Map.of("role", user.getRole(), "city", user.getCity())));
         String token = jwtService.generateToken(user.getUid(), user.getRole(), user.getFullName(), user.getPhone(), user.getEmail());
         return new AuthResponse(token, user);
     }

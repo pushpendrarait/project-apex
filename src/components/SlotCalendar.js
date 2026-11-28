@@ -35,6 +35,17 @@ export class SlotCalendar {
   }
 
   render(container) {
+    if (!this.selectedCourt) {
+      container.innerHTML = `
+        <div class="bg-[#131B2E] border border-white/10 rounded-3xl p-8 text-center space-y-4">
+          <div class="text-3xl">🏟️</div>
+          <h3 class="text-xl font-black text-white">${this.venue.name}</h3>
+          <p class="text-xs text-slate-400">No courts or turfs are configured for this facility yet.</p>
+          <button id="btn-back-venues" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white">← Back to Venues</button>
+        </div>`;
+      container.querySelector('#btn-back-venues')?.addEventListener('click', () => this.onBack && this.onBack());
+      return;
+    }
     this.availability = VenueService.getDailyAvailability(this.selectedCourt.courtId, this.selectedDate);
 
     container.innerHTML = `

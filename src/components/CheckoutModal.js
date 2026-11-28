@@ -218,25 +218,28 @@ export class CheckoutModal {
       try {
         const currentUser = UserService.getCurrentUser();
 
-        // 1. If Razorpay Checkout JS is loaded in the browser, launch Razorpay Gateway
-        if (typeof window !== 'undefined' && window.Razorpay) {
-          let orderData = null;
-          try {
-            const orderRes = await ApiClient.createRazorpayOrder({
-              amount: this.pricing.total,
-              currency: 'INR',
-              receipt: `rcpt_${this.context.court.courtId}_${Date.now()}`
-            });
-            if (orderRes && orderRes.data) {
-              orderData = orderRes.data;
-            }
-          } catch (e) {
-            console.warn('[CheckoutModal] Backend Razorpay order endpoint fallback:', e.message);
+        // 1. Obtain backend Razorpay Order when online; launch live SDK only for real merchant keys
+        let orderData = null;
+        try {
+          const orderRes = await ApiClient.createRazorpayOrder({
+            courtId: this.context.court.courtId,
+            date: this.context.date,
+            slot: this.context.slot,
+            amountInRupees: this.pricing.total,
+            promoCode: this.promoCode || null
+          });
+          if (orderRes && orderRes.data) {
+            orderData = orderRes.data;
           }
+        } catch (e) {
+          console.warn('[CheckoutModal] Backend Razorpay order endpoint fallback:', e.message);
+        }
 
-          const rzpKey = orderData?.key_id || 'rzp_test_ApexSports2026';
-          const rzpOrderId = orderData?.order_id || `order_${Math.random().toString(36).substring(2, 14)}`;
+        const rzpKey = orderData?.keyId || orderData?.key_id || 'rzp_test_ApexSports2026';
+        const rzpOrderId = orderData?.orderId || orderData?.order_id || `order_${Math.random().toString(36).substring(2, 14)}`;
+        const isSandboxKey = !rzpKey || rzpKey.includes('ApexSports') || rzpKey.includes('1DP5mmOlF5G5ag') || rzpKey.includes('dummy');
 
+        if (typeof window !== 'undefined' && window.Razorpay && !isSandboxKey) {
           const options = {
             key: rzpKey,
             amount: Math.round(this.pricing.total * 100),
@@ -298,8 +301,8 @@ export class CheckoutModal {
           return;
         }
 
-        // 2. Direct Atomic Commit (e.g. Unit tests, offline, or headless browser)
-        btnPay.innerHTML = `<span class="animate-spin mr-2">⏳</span> Processing Atomic Commit...`;
+        // 2. Sandbox Gateway & Server-Backed Atomic Commit
+        btnPay.innerHTML = `<span class="animate-spin mr-2">⏳</span> Committing Booking...`;
         const result = await BookingService.commitBooking({
           userId: currentUser.uid,
           userName: currentUser.displayName,
@@ -312,7 +315,10 @@ export class CheckoutModal {
           date: this.context.date,
           slot: this.context.slot,
           pricing: this.pricing,
-          paymentMethod: this.selectedMethod
+          paymentMethod: this.selectedMethod,
+          razorpayOrderId: rzpOrderId,
+          razorpayPaymentId: `pay_sbx_${Date.now()}`,
+          razorpaySignature: 'SIMULATED_TEST_SIGNATURE'
         });
 
         clearInterval(this.timerInterval);

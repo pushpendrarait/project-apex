@@ -163,7 +163,7 @@ export class AddVenueModal {
     const form = modal.querySelector('#form-add-venue');
     const feedback = modal.querySelector('#add-venue-feedback');
 
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
       const name = modal.querySelector('#input-venue-name').value;
@@ -182,9 +182,15 @@ export class AddVenueModal {
         return;
       }
 
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Publishing to Server...';
+      }
+
       try {
         const images = customImage ? [customImage] : [];
-        const newVenue = VenueService.createVenue({
+        const newVenue = await VenueService.createVenueAndSync({
           name,
           city,
           area,
@@ -202,8 +208,12 @@ export class AddVenueModal {
         setTimeout(() => {
           close();
           if (onVenueAdded) onVenueAdded(newVenue);
-        }, 800);
+        }, 500);
       } catch (err) {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = '+ Create & Publish Facility';
+        }
         feedback.className = 'text-xs p-3 rounded-xl bg-red-950/80 border border-red-500/50 text-red-300 block';
         feedback.textContent = `Error: ${err.message}`;
       }

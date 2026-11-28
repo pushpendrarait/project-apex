@@ -29,9 +29,12 @@ CREATE TABLE IF NOT EXISTS apex_users (
     loyalty_points BIGINT NOT NULL DEFAULT 100,
     is_phone_verified BOOLEAN NOT NULL DEFAULT TRUE,
     is_email_verified BOOLEAN NOT NULL DEFAULT TRUE,
+    venue_id VARCHAR(255),
     created_at BIGINT NOT NULL,
     updated_at BIGINT NOT NULL
 );
+
+ALTER TABLE apex_users ADD COLUMN IF NOT EXISTS venue_id VARCHAR(255);
 
 CREATE INDEX IF NOT EXISTS idx_apex_users_email ON apex_users (email);
 CREATE INDEX IF NOT EXISTS idx_apex_users_phone ON apex_users (phone);
@@ -213,10 +216,13 @@ CREATE TABLE IF NOT EXISTS apex_bookings (
     refund_amount_paise BIGINT,
     refund_status VARCHAR(64),
     cancellation_reason TEXT,
+    checked_in_at BIGINT,
     hold_expires_at BIGINT,
     created_at BIGINT NOT NULL,
     updated_at BIGINT NOT NULL
 );
+
+ALTER TABLE apex_bookings ADD COLUMN IF NOT EXISTS checked_in_at BIGINT;
 
 CREATE INDEX IF NOT EXISTS idx_apex_bookings_user_id ON apex_bookings (user_id);
 CREATE INDEX IF NOT EXISTS idx_apex_bookings_owner_id ON apex_bookings (owner_id);

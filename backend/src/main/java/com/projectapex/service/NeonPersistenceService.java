@@ -105,7 +105,7 @@ public class NeonPersistenceService {
                     owner_business_name = ?, owner_business_address = ?, owner_gst_number = ?, owner_pan_number = ?,
                     owner_verification_status = ?, owner_verified_at = ?, owner_payout_upi_or_bank_mask = ?,
                     owner_profile_json = ?, password_hash = ?, loyalty_points = ?,
-                    is_phone_verified = ?, is_email_verified = ?, created_at = ?, updated_at = ?
+                    is_phone_verified = ?, is_email_verified = ?, venue_id = ?, created_at = ?, updated_at = ?
                 WHERE uid = ?
                 """;
         String insertSql = """
@@ -114,8 +114,8 @@ public class NeonPersistenceService {
                     owner_business_name, owner_business_address, owner_gst_number, owner_pan_number,
                     owner_verification_status, owner_verified_at, owner_payout_upi_or_bank_mask,
                     owner_profile_json, password_hash, loyalty_points,
-                    is_phone_verified, is_email_verified, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    is_phone_verified, is_email_verified, venue_id, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
 
         executeUpsert(
@@ -140,6 +140,7 @@ public class NeonPersistenceService {
                     ps.setLong(i++, u.getLoyaltyPoints());
                     ps.setBoolean(i++, u.getIsPhoneVerified());
                     ps.setBoolean(i++, u.getIsEmailVerified());
+                    setNullableString(ps, i++, u.getVenueId());
                     ps.setLong(i++, createdAt);
                     ps.setLong(i++, updatedAt);
                     ps.setString(i, u.getUid());
@@ -166,6 +167,7 @@ public class NeonPersistenceService {
                     ps.setLong(i++, u.getLoyaltyPoints());
                     ps.setBoolean(i++, u.getIsPhoneVerified());
                     ps.setBoolean(i++, u.getIsEmailVerified());
+                    setNullableString(ps, i++, u.getVenueId());
                     ps.setLong(i++, createdAt);
                     ps.setLong(i, updatedAt);
                 }
@@ -205,6 +207,11 @@ public class NeonPersistenceService {
         u.setLoyaltyPoints(rs.getLong("loyalty_points"));
         u.setPhoneVerified(rs.getBoolean("is_phone_verified"));
         u.setEmailVerified(rs.getBoolean("is_email_verified"));
+        try {
+            u.setVenueId(rs.getString("venue_id"));
+        } catch (SQLException ignored) {
+            // Backward compatibility if column missing before migration
+        }
         u.setCreatedAt(rs.getLong("created_at"));
         u.setUpdatedAt(rs.getLong("updated_at"));
         return u;
@@ -1043,7 +1050,7 @@ public class NeonPersistenceService {
                     sport_type = ?, booking_date = ?, slots_json = ?, subtotal_paise = ?, discount_id = ?,
                     discount_code = ?, discount_amount_paise = ?, tax_paise = ?, final_payable_paise = ?, status = ?,
                     razorpay_order_id = ?, razorpay_payment_id = ?, refund_id = ?, refund_amount_paise = ?,
-                    refund_status = ?, cancellation_reason = ?, hold_expires_at = ?, created_at = ?, updated_at = ?
+                    refund_status = ?, cancellation_reason = ?, checked_in_at = ?, hold_expires_at = ?, created_at = ?, updated_at = ?
                 WHERE booking_id = ?
                 """;
         String insertSql = """
@@ -1053,8 +1060,8 @@ public class NeonPersistenceService {
                     sport_type, booking_date, slots_json, subtotal_paise, discount_id,
                     discount_code, discount_amount_paise, tax_paise, final_payable_paise, status,
                     razorpay_order_id, razorpay_payment_id, refund_id, refund_amount_paise,
-                    refund_status, cancellation_reason, hold_expires_at, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    refund_status, cancellation_reason, checked_in_at, hold_expires_at, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
 
         executeUpsert(
@@ -1089,6 +1096,7 @@ public class NeonPersistenceService {
                     setNullableLong(ps, i++, b.getRefundAmountPaise());
                     setNullableString(ps, i++, b.getRefundStatus());
                     setNullableString(ps, i++, b.getCancellationReason());
+                    setNullableLong(ps, i++, b.getCheckedInAt());
                     setNullableLong(ps, i++, b.getHoldExpiresAt());
                     ps.setLong(i++, createdAt);
                     ps.setLong(i++, updatedAt);
@@ -1126,6 +1134,7 @@ public class NeonPersistenceService {
                     setNullableLong(ps, i++, b.getRefundAmountPaise());
                     setNullableString(ps, i++, b.getRefundStatus());
                     setNullableString(ps, i++, b.getCancellationReason());
+                    setNullableLong(ps, i++, b.getCheckedInAt());
                     setNullableLong(ps, i++, b.getHoldExpiresAt());
                     ps.setLong(i++, createdAt);
                     ps.setLong(i, updatedAt);
@@ -1138,6 +1147,7 @@ public class NeonPersistenceService {
             BookingRecord b = new BookingRecord();
             b.setBookingId(rs.getString("booking_id"));
             b.setBookingCode(rs.getString("booking_code"));
+            b.setQrPassToken(rs.getString("qr_pass_token"));
             b.setUserId(rs.getString("user_id"));
             b.setUserName(rs.getString("user_name"));
             b.setUserPhone(rs.getString("user_phone"));
@@ -1164,6 +1174,11 @@ public class NeonPersistenceService {
             b.setRefundAmountPaise(getNullableLong(rs, "refund_amount_paise"));
             b.setRefundStatus(rs.getString("refund_status"));
             b.setCancellationReason(rs.getString("cancellation_reason"));
+            try {
+                b.setCheckedInAt(getNullableLong(rs, "checked_in_at"));
+            } catch (SQLException ignored) {
+                // Backward compatibility
+            }
             b.setHoldExpiresAt(getNullableLong(rs, "hold_expires_at"));
             b.setCreatedAt(rs.getLong("created_at"));
             b.setUpdatedAt(rs.getLong("updated_at"));
@@ -1599,6 +1614,44 @@ public class NeonPersistenceService {
             entry.setTimestamp(rs.getLong("created_at"));
             return entry;
         });
+    }
+
+    // =========================================================================
+    // CRUD Delete Operations (Users, Venues, Resources, Facilities, Bookings)
+    // =========================================================================
+
+    public void deleteUser(String uid) {
+        if (uid == null) return;
+        jdbcTemplate.update("DELETE FROM apex_users WHERE uid = ?", ps -> ps.setString(1, uid));
+    }
+
+    public void deleteVenue(String venueId) {
+        if (venueId == null) return;
+        jdbcTemplate.update("DELETE FROM apex_slot_locks WHERE venue_id = ?", ps -> ps.setString(1, venueId));
+        jdbcTemplate.update("DELETE FROM apex_date_overrides WHERE venue_id = ?", ps -> ps.setString(1, venueId));
+        jdbcTemplate.update("DELETE FROM apex_schedule_rules WHERE venue_id = ?", ps -> ps.setString(1, venueId));
+        jdbcTemplate.update("DELETE FROM apex_facilities WHERE venue_id = ?", ps -> ps.setString(1, venueId));
+        jdbcTemplate.update("DELETE FROM apex_resources WHERE venue_id = ?", ps -> ps.setString(1, venueId));
+        jdbcTemplate.update("DELETE FROM apex_venues WHERE venue_id = ?", ps -> ps.setString(1, venueId));
+    }
+
+    public void deleteResource(String resourceId) {
+        if (resourceId == null) return;
+        jdbcTemplate.update("DELETE FROM apex_slot_locks WHERE resource_id = ?", ps -> ps.setString(1, resourceId));
+        jdbcTemplate.update("DELETE FROM apex_date_overrides WHERE resource_id = ?", ps -> ps.setString(1, resourceId));
+        jdbcTemplate.update("DELETE FROM apex_schedule_rules WHERE resource_id = ?", ps -> ps.setString(1, resourceId));
+        jdbcTemplate.update("DELETE FROM apex_resources WHERE resource_id = ?", ps -> ps.setString(1, resourceId));
+    }
+
+    public void deleteFacility(String courtId) {
+        if (courtId == null) return;
+        jdbcTemplate.update("DELETE FROM apex_facilities WHERE court_id = ?", ps -> ps.setString(1, courtId));
+    }
+
+    public void deleteBooking(String bookingId) {
+        if (bookingId == null) return;
+        jdbcTemplate.update("DELETE FROM apex_slot_locks WHERE booking_id = ?", ps -> ps.setString(1, bookingId));
+        jdbcTemplate.update("DELETE FROM apex_bookings WHERE booking_id = ?", ps -> ps.setString(1, bookingId));
     }
 
     // =========================================================================

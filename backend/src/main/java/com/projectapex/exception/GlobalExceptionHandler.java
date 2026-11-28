@@ -23,12 +23,25 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(e.getMessage()));
     }
 
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(org.springframework.security.access.AccessDeniedException e) {
+        log.warn("Forbidden access: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(e.getMessage()));
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiResponse<Void>> handleConflict(IllegalStateException e) {
         log.warn("Conflict/State Error: {}", e.getMessage());
-        HttpStatus status = e.getMessage().contains("conflict") || e.getMessage().contains("reserved")
-                ? HttpStatus.CONFLICT
-                : HttpStatus.BAD_REQUEST;
+        String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+        HttpStatus status;
+        if (msg.contains("unauthorized") || msg.contains("not authorized") || msg.contains("forbidden")) {
+            status = HttpStatus.FORBIDDEN;
+        } else if (msg.contains("conflict") || msg.contains("reserved") || msg.contains("already booked")
+                || msg.contains("already locked") || msg.contains("already held") || msg.contains("currently held")) {
+            status = HttpStatus.CONFLICT;
+        } else {
+            status = HttpStatus.BAD_REQUEST;
+        }
         return ResponseEntity.status(status).body(ApiResponse.error(e.getMessage()));
     }
 

@@ -8,6 +8,7 @@ import com.projectapex.service.ConcurrencyService;
 import com.projectapex.service.VenueService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +22,13 @@ public class SlotController {
     public SlotController(VenueService venueService, ConcurrencyService concurrencyService) {
         this.venueService = venueService;
         this.concurrencyService = concurrencyService;
+    }
+
+    private String requireUserId(Authentication auth) {
+        if (auth == null || auth.getName() == null || "anonymousUser".equals(auth.getName())) {
+            throw new AccessDeniedException("Authentication required to lock or release slots");
+        }
+        return auth.getName();
     }
 
     /**
@@ -40,12 +48,8 @@ public class SlotController {
     @PostMapping("/lock")
     public ResponseEntity<ApiResponse<ConcurrencyLock>> acquireLock(
             @Valid @RequestBody AcquireLockRequest req,
-            Authentication auth,
-            @RequestHeader(value = "X-User-Id", required = false) String headerUserId) {
-        String userId = auth != null && auth.getName() != null && !"anonymousUser".equals(auth.getName())
-                ? auth.getName()
-                : (headerUserId != null ? headerUserId : "demo_player");
-
+            Authentication auth) {
+        String userId = requireUserId(auth);
         ConcurrencyLock lock = concurrencyService.acquireLock(req.getCourtId(), req.getDate(), req.getSlot(), userId);
         return ResponseEntity.ok(ApiResponse.ok("5-minute concurrency lease acquired successfully", lock));
     }
@@ -58,12 +62,8 @@ public class SlotController {
             @RequestParam String courtId,
             @RequestParam String date,
             @RequestParam String slot,
-            Authentication auth,
-            @RequestHeader(value = "X-User-Id", required = false) String headerUserId) {
-        String userId = auth != null && auth.getName() != null && !"anonymousUser".equals(auth.getName())
-                ? auth.getName()
-                : (headerUserId != null ? headerUserId : "demo_player");
-
+            Authentication auth) {
+        String userId = requireUserId(auth);
         concurrencyService.releaseLock(courtId, date, slot, userId);
         return ResponseEntity.ok(ApiResponse.ok("Lock released successfully", null));
     }

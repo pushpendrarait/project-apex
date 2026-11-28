@@ -8,6 +8,7 @@ import com.projectapex.model.*;
 import com.projectapex.service.VenueService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,20 +25,32 @@ public class OwnerVenueController {
         this.venueService = venueService;
     }
 
+    private String requireOwnerId(Authentication auth) {
+        if (auth == null || auth.getName() == null || "anonymousUser".equals(auth.getName())) {
+            throw new AccessDeniedException("Owner authentication required");
+        }
+        return auth.getName();
+    }
+
+    private boolean isAdmin(Authentication auth) {
+        return auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+    }
+
     @PostMapping("/venues")
     public ResponseEntity<ApiResponse<VenueRecord>> createVenue(
             @Valid @RequestBody CreateVenueRequest req,
             Authentication auth
     ) {
-        String ownerId = auth != null ? auth.getName() : "demo_owner";
+        String ownerId = requireOwnerId(auth);
         VenueRecord venue = venueService.createVenue(ownerId, req);
         return ResponseEntity.ok(ApiResponse.ok("Venue created successfully", venue));
     }
 
     @GetMapping("/venues")
     public ResponseEntity<ApiResponse<List<VenueRecord>>> getOwnerVenues(Authentication auth) {
-        String ownerId = auth != null ? auth.getName() : "demo_owner";
-        List<VenueRecord> venues = venueService.getOwnerVenues(ownerId);
+        String ownerId = requireOwnerId(auth);
+        List<VenueRecord> venues = venueService.getOwnerVenues(isAdmin(auth) ? "admin" : ownerId);
         return ResponseEntity.ok(ApiResponse.ok("Owner venues retrieved", venues));
     }
 
@@ -47,9 +60,19 @@ public class OwnerVenueController {
             @Valid @RequestBody CreateVenueRequest req,
             Authentication auth
     ) {
-        String ownerId = auth != null ? auth.getName() : "demo_owner";
-        VenueRecord updated = venueService.updateVenue(venueId, ownerId, req);
+        String ownerId = requireOwnerId(auth);
+        VenueRecord updated = venueService.updateVenue(venueId, isAdmin(auth) ? "admin" : ownerId, req);
         return ResponseEntity.ok(ApiResponse.ok("Venue updated successfully", updated));
+    }
+
+    @DeleteMapping("/venues/{venueId}")
+    public ResponseEntity<ApiResponse<Void>> deleteVenue(
+            @PathVariable String venueId,
+            Authentication auth
+    ) {
+        String ownerId = requireOwnerId(auth);
+        venueService.deleteVenue(venueId, ownerId, isAdmin(auth));
+        return ResponseEntity.ok(ApiResponse.ok("Venue deleted successfully", null));
     }
 
     @PostMapping("/venues/{venueId}/resources")
@@ -58,8 +81,8 @@ public class OwnerVenueController {
             @Valid @RequestBody CreateResourceRequest req,
             Authentication auth
     ) {
-        String ownerId = auth != null ? auth.getName() : "demo_owner";
-        ResourceRecord r = venueService.createResource(ownerId, venueId, req);
+        String ownerId = requireOwnerId(auth);
+        ResourceRecord r = venueService.createResource(isAdmin(auth) ? "admin" : ownerId, venueId, req);
         return ResponseEntity.ok(ApiResponse.ok("Resource added to venue", r));
     }
 
@@ -69,9 +92,19 @@ public class OwnerVenueController {
             @Valid @RequestBody CreateResourceRequest req,
             Authentication auth
     ) {
-        String ownerId = auth != null ? auth.getName() : "demo_owner";
-        ResourceRecord r = venueService.updateResource(resourceId, ownerId, req);
+        String ownerId = requireOwnerId(auth);
+        ResourceRecord r = venueService.updateResource(resourceId, isAdmin(auth) ? "admin" : ownerId, req);
         return ResponseEntity.ok(ApiResponse.ok("Resource updated", r));
+    }
+
+    @DeleteMapping("/resources/{resourceId}")
+    public ResponseEntity<ApiResponse<Void>> deleteResource(
+            @PathVariable String resourceId,
+            Authentication auth
+    ) {
+        String ownerId = requireOwnerId(auth);
+        venueService.deleteResource(resourceId, ownerId, isAdmin(auth));
+        return ResponseEntity.ok(ApiResponse.ok("Resource deleted successfully", null));
     }
 
     @PutMapping("/resources/{resourceId}/schedule")
@@ -80,8 +113,8 @@ public class OwnerVenueController {
             @RequestBody ScheduleRuleRecord schedule,
             Authentication auth
     ) {
-        String ownerId = auth != null ? auth.getName() : "demo_owner";
-        ScheduleRuleRecord rule = venueService.updateScheduleRule(resourceId, ownerId, schedule);
+        String ownerId = requireOwnerId(auth);
+        ScheduleRuleRecord rule = venueService.updateScheduleRule(resourceId, isAdmin(auth) ? "admin" : ownerId, schedule);
         return ResponseEntity.ok(ApiResponse.ok("Weekly schedule updated", rule));
     }
 
@@ -92,8 +125,8 @@ public class OwnerVenueController {
             @RequestBody DateOverrideRequest req,
             Authentication auth
     ) {
-        String ownerId = auth != null ? auth.getName() : "demo_owner";
-        DateOverrideRecord override = venueService.updateDateOverride(resourceId, ownerId, date, req);
+        String ownerId = requireOwnerId(auth);
+        DateOverrideRecord override = venueService.updateDateOverride(resourceId, isAdmin(auth) ? "admin" : ownerId, date, req);
         return ResponseEntity.ok(ApiResponse.ok("Date override saved", override));
     }
 }

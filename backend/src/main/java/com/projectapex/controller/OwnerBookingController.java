@@ -5,6 +5,7 @@ import com.projectapex.dto.response.ApiResponse;
 import com.projectapex.model.BookingRecord;
 import com.projectapex.service.BookingService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,13 +24,21 @@ public class OwnerBookingController {
         this.bookingService = bookingService;
     }
 
+    private String resolveActorId(Authentication auth) {
+        if (auth == null || auth.getName() == null || "anonymousUser".equals(auth.getName())) {
+            throw new AccessDeniedException("Owner authentication required");
+        }
+        boolean isAdmin = auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        return isAdmin ? "admin" : auth.getName();
+    }
+
     @GetMapping("/bookings")
     public ResponseEntity<ApiResponse<List<BookingRecord>>> getOwnerBookings(
             @RequestParam(required = false) String date,
             @RequestParam(required = false) String status,
             Authentication auth
     ) {
-        String ownerId = auth != null ? auth.getName() : "demo_owner";
+        String ownerId = resolveActorId(auth);
         List<BookingRecord> bookings = bookingService.getOwnerBookings(ownerId, date, status);
         return ResponseEntity.ok(ApiResponse.ok("Owner bookings retrieved", bookings));
     }
@@ -40,7 +49,7 @@ public class OwnerBookingController {
             @RequestBody Map<String, String> body,
             Authentication auth
     ) {
-        String ownerId = auth != null ? auth.getName() : "demo_owner";
+        String ownerId = resolveActorId(auth);
         String status = body.getOrDefault("status", "COMPLETED");
         BookingRecord b = bookingService.updateBookingStatusByOwner(bookingId, ownerId, status);
         return ResponseEntity.ok(ApiResponse.ok("Booking marked as " + status, b));
@@ -49,18 +58,18 @@ public class OwnerBookingController {
     @PostMapping("/bookings/{bookingId}/cancel")
     public ResponseEntity<ApiResponse<BookingRecord>> emergencyCancel(
             @PathVariable String bookingId,
-            @RequestBody Map<String, String> body,
+            @RequestBody(required = false) Map<String, String> body,
             Authentication auth
     ) {
-        String ownerId = auth != null ? auth.getName() : "demo_owner";
-        String reason = body.getOrDefault("reason", "Venue emergency / maintenance");
+        String ownerId = resolveActorId(auth);
+        String reason = body != null ? body.getOrDefault("reason", "Venue emergency / maintenance") : "Venue emergency / maintenance";
         BookingRecord b = bookingService.cancelBookingByOwner(bookingId, ownerId, reason);
         return ResponseEntity.ok(ApiResponse.ok("Booking cancelled with 100% full refund to player", b));
     }
 
     @GetMapping("/analytics/summary")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getAnalyticsSummary(Authentication auth) {
-        String ownerId = auth != null ? auth.getName() : "demo_owner";
+        String ownerId = resolveActorId(auth);
         List<BookingRecord> bookings = bookingService.getOwnerBookings(ownerId, null, null);
 
         long totalRevenuePaise = 0;

@@ -73,6 +73,15 @@ public class OtpService {
 
         String phone = normalizePhone(rawPhone);
         String email = rawEmail.trim().toLowerCase();
+        String phoneDigits = phone.replaceAll("[^0-9]", "");
+        boolean duplicate = firebaseService.getUsers().values().stream().anyMatch(u ->
+                (u.getEmail() != null && u.getEmail().trim().equalsIgnoreCase(email)) ||
+                (phoneDigits.length() >= 10 && u.getPhone() != null
+                        && u.getPhone().replaceAll("[^0-9]", "").endsWith(phoneDigits.substring(phoneDigits.length() - 10)))
+        );
+        if (duplicate) {
+            throw new IllegalArgumentException("An account is already registered with this mobile number or email. Please sign in instead.");
+        }
         long now = System.currentTimeMillis();
         String sessionId = "otp_reg_" + now + "_" + UUID.randomUUID().toString().substring(0, 6);
 

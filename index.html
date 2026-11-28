@@ -295,6 +295,8 @@
     import { VenueOwnerPortal } from './src/components/VenueOwnerPortal.js';
     import { AdminConsole } from './src/components/AdminConsole.js';
     import { LegalModal } from './src/components/LegalModal.js';
+    import { VenueService } from './src/services/venueService.js';
+    import { BookingService } from './src/services/bookingService.js';
     import { UserService } from './src/services/userService.js';
     import { AddVenueModal } from './src/components/AddVenueModal.js';
     import { UserAuthModal } from './src/components/UserAuthModal.js';
@@ -321,6 +323,7 @@
         this.bindHeaderLocationAndSearch();
         this.bindLegalEvents();
         this.checkBackendHealth();
+        this.syncInitialCloudState();
         this.registerServiceWorker();
         this.renderView('explore');
 
@@ -345,6 +348,34 @@
           hash === '#signup'
         ) {
           this.openAuthModal('register');
+        }
+      }
+
+      async syncInitialCloudState() {
+        try {
+          await VenueService.syncVenuesFromBackend();
+          if (ApiClient.getToken()) {
+            const meRes = await ApiClient.getMe().catch(() => null);
+            if (meRes && meRes.data && meRes.data.uid) {
+              const raw = meRes.data;
+              const syncedUser = {
+                ...raw,
+                displayName: raw.displayName || raw.fullName || 'Apex User',
+                venueId: raw.venueId || null
+              };
+              const { mockDb } = await import('./src/services/firebaseConfig.js');
+              mockDb.data.users[syncedUser.uid] = { ...(mockDb.data.users[syncedUser.uid] || {}), ...syncedUser };
+              mockDb.persist();
+              UserService.setCurrentUser(syncedUser.uid);
+              this.updateHeaderUser();
+              await BookingService.syncMyBookingsFromBackend();
+            }
+          }
+          if (this.currentView === 'explore') {
+            this.renderView('explore');
+          }
+        } catch (e) {
+          console.warn('[ApexApp] Initial cloud hydration warning:', e.message);
         }
       }
 
@@ -444,7 +475,7 @@
         if (user) {
           if (avatar) {
             avatar.textContent = user.displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-            avatar.className = user.role === 'venue_owner'
+            avatar.className = ApiClient.isOwnerRole(user.role)
               ? 'w-6 h-6 rounded-lg bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 font-black text-[11px] flex items-center justify-center'
               : 'w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-black text-[11px] flex items-center justify-center';
           }
@@ -452,8 +483,8 @@
             nameEl.textContent = user.displayName.split(' ')[0];
           }
           if (roleEl) {
-            roleEl.textContent = user.role === 'venue_owner' ? 'Owner' : 'Player';
-            roleEl.className = user.role === 'venue_owner'
+            roleEl.textContent = ApiClient.isOwnerRole(user.role) ? 'Owner' : 'Player';
+            roleEl.className = ApiClient.isOwnerRole(user.role)
               ? 'text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-indigo-950 text-indigo-300 border border-indigo-800 hidden lg:inline'
               : 'text-[9px] uppercase px-1.5 py-0.2 rounded font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 hidden lg:inline';
           }
@@ -971,6 +1002,9 @@
               onShowPass: (booking) => {
                 this.activeBooking = booking;
                 this.renderView('confirmation');
+              },
+              onUserChanged: () => {
+                this.updateHeaderUser();
               }
             });
             portal.render(this.appRoot);

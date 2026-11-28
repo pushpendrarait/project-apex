@@ -5,8 +5,9 @@
  */
 
 import { mockDb } from './firebaseConfig.js';
+import { ApiClient } from './apiClient.js';
 
-const LOCK_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL lease
+const LOCK_TTL_MS = 10 * 60 * 1000; // 10 minutes TTL lease
 
 export class ConcurrencyService {
   /**
@@ -24,6 +25,18 @@ export class ConcurrencyService {
   static async acquireLock({ courtId, date, slot, userId }) {
     const lockKey = this.getLockKey(courtId, date, slot);
     const now = Date.now();
+
+    if (typeof window !== 'undefined' && ApiClient.getToken()) {
+      try {
+        await ApiClient.acquireLock({ courtId, date, slot });
+      } catch (err) {
+        const msg = (err.message || '').toLowerCase();
+        if (msg.includes('conflict') || msg.includes('reserved') || msg.includes('booked') || msg.includes('409') || msg.includes('403') || msg.includes('authentication')) {
+          throw err;
+        }
+        console.warn('[ConcurrencyService] Backend acquireLock fallback:', err.message);
+      }
+    }
 
     // In a live Firestore project, this executes via runTransaction(db, async (tx) => ...)
     const existingLock = mockDb.data.concurrency_locks[lockKey];
@@ -84,6 +97,14 @@ export class ConcurrencyService {
    * Releases an uncommitted lock (e.g., user cancels checkout)
    */
   static async releaseLock({ courtId, date, slot, userId }) {
+    if (typeof window !== 'undefined' && ApiClient.getToken()) {
+      try {
+        await ApiClient.releaseLock({ courtId, date, slot });
+      } catch (err) {
+        console.warn('[ConcurrencyService] Backend releaseLock fallback:', err.message);
+      }
+    }
+
     const lockKey = this.getLockKey(courtId, date, slot);
     const lock = mockDb.data.concurrency_locks[lockKey];
 

@@ -130,7 +130,48 @@ public class VenueService {
         return v;
     }
 
-    @CacheEvict(value = "resources", allEntries = true)
+    @CacheEvict(value = {"venues", "resources"}, allEntries = true)
+    public synchronized boolean deleteVenue(String venueId, String ownerId, boolean isAdmin) {
+        VenueRecord v = getVenueById(venueId);
+        if (!v.getOwnerId().equals(ownerId) && !isAdmin && !"admin".equalsIgnoreCase(ownerId)) {
+            throw new IllegalStateException("Unauthorized to delete this venue.");
+        }
+        String todayIst = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")).toString();
+        boolean hasActiveBooking = firebaseService.getBookings().values().stream()
+                .anyMatch(b -> venueId.equals(b.getVenueId())
+                        && ("CONFIRMED".equalsIgnoreCase(b.getStatus())
+                            || "PENDING_PAYMENT".equalsIgnoreCase(b.getStatus())
+                            || "CHECKED_IN".equalsIgnoreCase(b.getStatus()))
+                        && (b.getBookingDate() == null || b.getBookingDate().compareTo(todayIst) >= 0));
+        if (hasActiveBooking) {
+            throw new IllegalStateException("Conflict: Cannot delete venue while active or upcoming bookings exist.");
+        }
+
+        List<String> resIds = firebaseService.getResources().values().stream()
+                .filter(r -> venueId.equals(r.getVenueId()))
+                .map(ResourceRecord::getResourceId)
+                .toList();
+        for (String rid : resIds) {
+            firebaseService.getResources().remove(rid);
+            firebaseService.getScheduleRules().remove(rid);
+        }
+
+        List<String> courtIds = firebaseService.getCourts().values().stream()
+                .filter(c -> venueId.equals(c.getVenueId()))
+                .map(FacilityRecord::getCourtId)
+                .toList();
+        for (String cid : courtIds) {
+            firebaseService.getCourts().remove(cid);
+        }
+
+        firebaseService.getVenues().remove(venueId);
+        firebaseService.getAuditLogs().add(new AuditLog(
+                "audit_ven_del_" + System.currentTimeMillis(), "VENUE_DELETED", ownerId, "venue", venueId,
+                Map.of("name", v.getName())));
+        return true;
+    }
+
+    @CacheEvict(value = {"venues", "resources"}, allEntries = true)
     public synchronized ResourceRecord createResource(String ownerId, String venueId, CreateResourceRequest req) {
         VenueRecord venue = getVenueById(venueId);
         if (!venue.getOwnerId().equals(ownerId) && !"admin".equalsIgnoreCase(ownerId)) {
@@ -187,6 +228,28 @@ public class VenueService {
         r.setUpdatedAt(System.currentTimeMillis());
         firebaseService.persistResource(r);
         return r;
+    }
+
+    @CacheEvict(value = {"venues", "resources"}, allEntries = true)
+    public synchronized boolean deleteResource(String resourceId, String ownerId, boolean isAdmin) {
+        ResourceRecord r = firebaseService.getResources().get(resourceId);
+        if (r == null) {
+            throw new IllegalArgumentException("Resource not found: " + resourceId);
+        }
+        if (!r.getOwnerId().equals(ownerId) && !isAdmin && !"admin".equalsIgnoreCase(ownerId)) {
+            throw new IllegalStateException("Unauthorized to delete this resource.");
+        }
+        boolean hasActiveBooking = firebaseService.getBookings().values().stream()
+                .anyMatch(b -> resourceId.equals(b.getResourceId())
+                        && ("CONFIRMED".equalsIgnoreCase(b.getStatus())
+                            || "PENDING_PAYMENT".equalsIgnoreCase(b.getStatus())
+                            || "CHECKED_IN".equalsIgnoreCase(b.getStatus())));
+        if (hasActiveBooking) {
+            throw new IllegalStateException("Conflict: Cannot delete resource with active bookings.");
+        }
+        firebaseService.getResources().remove(resourceId);
+        firebaseService.getScheduleRules().remove(resourceId);
+        return true;
     }
 
     public synchronized ScheduleRuleRecord updateScheduleRule(String resourceId, String ownerId, ScheduleRuleRecord updated) {
@@ -248,10 +311,14 @@ public class VenueService {
         return venue;
     }
 
+    @CacheEvict(value = {"venues", "resources"}, allEntries = true)
     public synchronized FacilityRecord createFacility(String ownerId, CreateFacilityRequest req) {
         VenueRecord venue = firebaseService.getVenues().get(req.getVenueId());
         if (venue == null) {
             throw new IllegalArgumentException("Venue ID not found: " + req.getVenueId());
+        }
+        if (ownerId != null && !"admin".equalsIgnoreCase(ownerId) && !ownerId.equals(venue.getOwnerId())) {
+            throw new IllegalStateException("Unauthorized to add facility to this venue.");
         }
 
         String courtSlug = req.getName().toLowerCase().replaceAll("[^a-z0-9]", "_");
@@ -275,7 +342,101 @@ public class VenueService {
         facility.setCreatedAt(System.currentTimeMillis());
 
         firebaseService.getCourts().put(courtId, facility);
+
+        // Keep ResourceRecord + ScheduleRuleRecord synced for /api/v1/availability & booking engine
+        ResourceRecord res = new ResourceRecord(
+                courtId,
+                venue.getVenueId(),
+                venue.getOwnerId(),
+                facility.getName(),
+                List.of(facility.getSport().toUpperCase()),
+                (long) facility.getBaseHourlyRate() * 100L
+        );
+        res.setPeakHourPricePaise((long) facility.getPeakHourlyRate() * 100L);
+        res.setMaxPlayers(facility.getCapacity());
+        res.setSurfaceType(facility.getSurface());
+        res.setIndoor(facility.getFacilityType() != null && facility.getFacilityType().toLowerCase().contains("indoor"));
+        firebaseService.getResources().put(res.getResourceId(), res);
+        firebaseService.getScheduleRules().put(res.getResourceId(), new ScheduleRuleRecord(res.getResourceId(), venue.getVenueId(), venue.getOwnerId()));
+
+        firebaseService.getAuditLogs().add(new AuditLog(
+                "audit_fac_add_" + System.currentTimeMillis(), "FACILITY_CREATED", ownerId, "facility", courtId,
+                Map.of("venueId", venue.getVenueId(), "name", facility.getName(), "baseRate", facility.getBaseHourlyRate())));
         return facility;
+    }
+
+    public FacilityRecord getFacility(String courtId) {
+        FacilityRecord f = firebaseService.getCourts().get(courtId);
+        if (f == null) {
+            throw new IllegalArgumentException("Facility not found: " + courtId);
+        }
+        return f;
+    }
+
+    @CacheEvict(value = {"venues", "resources"}, allEntries = true)
+    public synchronized FacilityRecord updateFacility(String courtId, String ownerId, CreateFacilityRequest req, boolean isAdmin) {
+        FacilityRecord f = getFacility(courtId);
+        VenueRecord venue = firebaseService.getVenues().get(f.getVenueId());
+        if (venue != null && !venue.getOwnerId().equals(ownerId) && !isAdmin && !"admin".equalsIgnoreCase(ownerId)) {
+            throw new IllegalStateException("Unauthorized to update this facility.");
+        }
+
+        if (req.getName() != null) f.setName(req.getName());
+        if (req.getSport() != null) f.setSport(req.getSport().toLowerCase());
+        if (req.getFacilityType() != null) f.setFacilityType(req.getFacilityType());
+        if (req.getCapacity() != null) f.setCapacity(req.getCapacity());
+        if (req.getSurface() != null) f.setSurface(req.getSurface());
+        if (req.getDimensions() != null) f.setDimensions(req.getDimensions());
+        if (req.getBaseHourlyRate() != null) f.setBaseHourlyRate(req.getBaseHourlyRate());
+        if (req.getPeakHourlyRate() != null) f.setPeakHourlyRate(req.getPeakHourlyRate());
+        if (req.getOddHourDiscountPct() != null) f.setOddHourDiscountPct(req.getOddHourDiscountPct());
+        if (req.getHasFloodlights() != null) f.setHasFloodlights(req.getHasFloodlights());
+        if (req.getAmenities() != null) f.setAmenities(req.getAmenities());
+        firebaseService.persistFacility(f);
+
+        ResourceRecord res = firebaseService.getResources().get(courtId);
+        if (res != null) {
+            res.setName(f.getName());
+            res.setSportTypes(List.of(f.getSport().toUpperCase()));
+            res.setBasePricePaise((long) f.getBaseHourlyRate() * 100L);
+            res.setPeakHourPricePaise((long) f.getPeakHourlyRate() * 100L);
+            res.setMaxPlayers(f.getCapacity());
+            res.setSurfaceType(f.getSurface());
+            res.setUpdatedAt(System.currentTimeMillis());
+            firebaseService.persistResource(res);
+        }
+
+        firebaseService.getAuditLogs().add(new AuditLog(
+                "audit_fac_upd_" + System.currentTimeMillis(), "FACILITY_UPDATED", ownerId, "facility", courtId,
+                Map.of("name", f.getName(), "baseRate", f.getBaseHourlyRate())));
+        return f;
+    }
+
+    @CacheEvict(value = {"venues", "resources"}, allEntries = true)
+    public synchronized boolean deleteFacility(String courtId, String ownerId, boolean isAdmin) {
+        FacilityRecord f = getFacility(courtId);
+        VenueRecord venue = firebaseService.getVenues().get(f.getVenueId());
+        if (venue != null && !venue.getOwnerId().equals(ownerId) && !isAdmin && !"admin".equalsIgnoreCase(ownerId)) {
+            throw new IllegalStateException("Unauthorized to delete this facility.");
+        }
+        boolean hasActiveBooking = firebaseService.getBookings().values().stream()
+                .anyMatch(b -> courtId.equals(b.getResourceId())
+                        && ("CONFIRMED".equalsIgnoreCase(b.getStatus())
+                            || "PENDING_PAYMENT".equalsIgnoreCase(b.getStatus())
+                            || "CHECKED_IN".equalsIgnoreCase(b.getStatus())));
+        if (hasActiveBooking) {
+            throw new IllegalStateException("Conflict: Cannot delete facility while active bookings exist.");
+        }
+
+        firebaseService.getCourts().remove(courtId);
+        if (firebaseService.getResources().containsKey(courtId)) {
+            firebaseService.getResources().remove(courtId);
+            firebaseService.getScheduleRules().remove(courtId);
+        }
+        firebaseService.getAuditLogs().add(new AuditLog(
+                "audit_fac_del_" + System.currentTimeMillis(), "FACILITY_DELETED", ownerId, "facility", courtId,
+                Map.of("venueId", f.getVenueId())));
+        return true;
     }
 
     public synchronized AvailabilityDoc getDailyAvailability(String courtId, String date) {

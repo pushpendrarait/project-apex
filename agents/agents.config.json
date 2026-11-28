@@ -4,8 +4,8 @@
   "governance": "Spec Kitty Spec-Driven Development",
   "hierarchy": {
     "rootCoordinator": "apex-pm",
-    "totalAgents": 8,
-    "pattern": "apex-pm -> [apex-ba, apex-tech-lead -> [apex-ui, apex-java, apex-db, apex-deploy, apex-mobile]]"
+    "totalAgents": 9,
+    "pattern": "apex-pm -> [apex-ba, apex-tech-lead -> [apex-ui, apex-java, apex-db, apex-deploy, apex-mobile, apex-test-lead]]"
   },
   "architecture": {
     "model": "3-Tier Multi-Cloud Architecture",
@@ -131,7 +131,8 @@
         "apex-java",
         "apex-db",
         "apex-deploy",
-        "apex-mobile"
+        "apex-mobile",
+        "apex-test-lead"
       ],
       "duties": [
         "Own end-to-end 3-tier integration across Firebase Hosting, Android & iOS mobile apps, Render Java 21 middleware, and Neon Serverless PostgreSQL",
@@ -248,6 +249,28 @@
         "ios/",
         "ios/Package.swift",
         "ios/ProjectApex/Sources/Network/ApexApiClient.swift"
+      ]
+    },
+    "apex-test-lead": {
+      "name": "Test Lead (QA & Release Certification)",
+      "slug": "apex-test-lead",
+      "role": "End-to-End Test Strategy, Live UI+API+DB Verification & Release Certification",
+      "tier": "QA & Release Certification (All 3 Cloud Tiers)",
+      "reportsTo": "apex-tech-lead",
+      "collaboratesWith": [
+        "apex-ba"
+      ],
+      "directReports": [],
+      "duties": [
+        "Report directly to apex-tech-lead and partner closely with apex-ba to translate BA-01..BA-08 and all user personas (Player, Facility Owner, Guest, Webhook/Admin) into a traceable master test suite",
+        "Cover full CRUD and lifecycle workflows across user creation/profile updates/Dual-OTP & password auth, facility/venue/court creation/update/delete, slot holds & ACID locks, booking creation/reschedule/cancellation/refund, walk-in cash, Gate QR check-in, and RBAC guards",
+        "Execute automated UI, REST API, and live Neon Serverless PostgreSQL SQL verification scripts and capture auditable evidence across all 3 tiers",
+        "Sign off formal Release Certification only upon observed pass results across backend JUnit, frontend JS suite, live browser UI E2E, Neon DB snapshots, and Android build checks"
+      ],
+      "artifacts": [
+        "docs/qa/test-plan-and-cases.md",
+        "docs/qa/test-evidence-and-release-certification.md",
+        "tests/e2e/full-workflow-suite.mjs"
       ]
     }
   }

@@ -8,6 +8,7 @@ import com.projectapex.service.BookingService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,18 +24,22 @@ public class GateController {
         this.bookingService = bookingService;
     }
 
+    private String requireOwnerId(Authentication auth) {
+        if (auth == null || auth.getName() == null || "anonymousUser".equals(auth.getName())) {
+            throw new AccessDeniedException("Owner authentication required");
+        }
+        boolean isAdmin = auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        return isAdmin ? "admin" : auth.getName();
+    }
+
     /**
      * Verifies digital scannable QR Pass Token at stadium / turf turnstiles
      */
     @PostMapping("/verify-pass")
     public ResponseEntity<ApiResponse<Map<String, Object>>> verifyGatePass(
             @Valid @RequestBody VerifyGatePassRequest req,
-            Authentication auth,
-            @RequestHeader(value = "X-Owner-Id", required = false) String headerOwnerId) {
-        String ownerId = auth != null && auth.getName() != null && !"anonymousUser".equals(auth.getName())
-                ? auth.getName()
-                : (headerOwnerId != null ? headerOwnerId : "demo_owner");
-
+            Authentication auth) {
+        String ownerId = requireOwnerId(auth);
         Map<String, Object> result = bookingService.verifyGatePass(req.getQrPassToken(), ownerId);
         return ResponseEntity.ok(ApiResponse.ok("Gate token processed", result));
     }
@@ -45,12 +50,8 @@ public class GateController {
     @PostMapping("/walk-in")
     public ResponseEntity<ApiResponse<BookingRecord>> createWalkInBooking(
             @Valid @RequestBody WalkInBookingRequest req,
-            Authentication auth,
-            @RequestHeader(value = "X-Owner-Id", required = false) String headerOwnerId) {
-        String ownerId = auth != null && auth.getName() != null && !"anonymousUser".equals(auth.getName())
-                ? auth.getName()
-                : (headerOwnerId != null ? headerOwnerId : "demo_owner");
-
+            Authentication auth) {
+        String ownerId = requireOwnerId(auth);
         BookingRecord booking = bookingService.createWalkInBooking(
                 ownerId,
                 req.getCourtId(),

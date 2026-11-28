@@ -87,18 +87,18 @@ public class FirebaseService {
     public FirebaseService(NeonPersistenceService neonPersistenceService) {
         this.neonPersistenceService = neonPersistenceService;
 
-        this.users = new PersistingMap<>(rawUsers, this::persistUser, null);
-        this.venues = new PersistingMap<>(rawVenues, this::persistVenue, null);
-        this.resources = new PersistingMap<>(rawResources, this::persistResource, null);
+        this.users = new PersistingMap<>(rawUsers, this::persistUser, (k, v) -> deleteUserFromDb(k));
+        this.venues = new PersistingMap<>(rawVenues, this::persistVenue, (k, v) -> deleteVenueFromDb(k));
+        this.resources = new PersistingMap<>(rawResources, this::persistResource, (k, v) -> deleteResourceFromDb(k));
         this.scheduleRules = new PersistingMap<>(rawScheduleRules, this::persistScheduleRule, null);
         this.dateOverrides = new PersistingMap<>(rawDateOverrides, this::persistDateOverride, null);
         this.slotLocks = new PersistingMap<>(rawSlotLocks, this::persistSlotLock, this::onSlotLockRemoved);
         this.discounts = new PersistingMap<>(rawDiscounts, this::persistDiscount, null);
-        this.bookings = new PersistingMap<>(rawBookings, this::persistBooking, null);
+        this.bookings = new PersistingMap<>(rawBookings, this::persistBooking, (k, v) -> deleteBookingFromDb(k));
         this.payments = new PersistingMap<>(rawPayments, this::persistPayment, null);
         this.webhookEvents = new PersistingMap<>(rawWebhookEvents, this::persistWebhookEvent, null);
 
-        this.courts = new PersistingMap<>(rawCourts, this::persistFacility, null);
+        this.courts = new PersistingMap<>(rawCourts, this::persistFacility, (k, v) -> deleteFacilityFromDb(k));
         this.availability = new PersistingMap<>(rawAvailability, this::persistAvailabilityDoc, null);
         this.concurrencyLocks = new PersistingMap<>(rawConcurrencyLocks, this::persistConcurrencyLock, this::onConcurrencyLockRemoved);
         this.transactions = new PersistingMap<>(rawTransactions, this::persistTransaction, null);
@@ -246,7 +246,21 @@ public class FirebaseService {
             venues.put(v4.getVenueId(), v4);
         }
 
+        if (!venues.containsKey("venue_thane_05")) {
+            VenueRecord v5 = new VenueRecord("venue_thane_05", "demo_owner", "Kasarvadavali Prime Turf Arena", "Kasarvadavali", "thane");
+            v5.setDescription("Flagship Kasarvadavali box cricket & 5v5 football complex managed by Santosh Kadam.");
+            v5.setAmenities(List.of("FIFA-grade Turf", "LED Floodlights", "Changing Rooms", "Free Parking", "Drinking Water"));
+            v5.setSportTypes(List.of("CRICKET_TURF", "FOOTBALL_TURF"));
+            v5.setMinSlotPricePaise(100000);
+            v5.setRating(4.8);
+            v5.setReviewCount(164);
+            v5.setImageUrls(List.of("https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=800&q=80"));
+            venues.put(v5.getVenueId(), v5);
+        }
+
         // 2. Seed Resources (Playable Units)
+        createResource("res_thane_05_crk", "venue_thane_05", "demo_owner", "Kasarvadavali Arena Pitch 1",
+                List.of("CRICKET_TURF", "FOOTBALL_TURF"), 60, 100000, "ARTIFICIAL_TURF", false);
         createResource("res_thane_crk_01", "venue_thane_01", "owner_01", "Main Arena 8v8 Box Cricket",
                 List.of("CRICKET_TURF"), 60, 120000, "ARTIFICIAL_TURF", false);
         createResource("res_thane_fb_01", "venue_thane_01", "owner_01", "Championship 5-a-Side Football",
@@ -329,12 +343,32 @@ public class FirebaseService {
             users.put(player.getUid(), player);
         }
 
+        if (!courts.containsKey("court_thane_05_crk")) {
+            FacilityRecord c5 = new FacilityRecord();
+            c5.setCourtId("court_thane_05_crk");
+            c5.setVenueId("venue_thane_05");
+            c5.setName("Kasarvadavali Arena Pitch 1");
+            c5.setSport("cricket");
+            c5.setBaseHourlyRate(1000);
+            c5.setPeakHourlyRate(1350);
+            c5.setOddHourDiscountPct(35);
+            c5.setHasFloodlights(true);
+            courts.put(c5.getCourtId(), c5);
+        }
+
         if (!users.containsKey("demo_owner")) {
             UserRecord owner = new UserRecord("demo_owner", "santosh@apexarena.com", "Santosh Kadam", "+91 98190 54321", "ROLE_OWNER");
             OwnerProfile op = new OwnerProfile("Apex Sports LLP", "Opp. Hypercity, Kasarvadavali, Thane West", "27AAAAA0000A1Z5", "AAAAA0000A");
             owner.setOwnerProfile(op);
+            owner.setVenueId("venue_thane_05");
             owner.setPasswordHash(hashPassword("password123"));
             users.put(owner.getUid(), owner);
+        } else {
+            UserRecord existingOwner = users.get("demo_owner");
+            if (existingOwner != null && !"venue_thane_05".equals(existingOwner.getVenueId())) {
+                existingOwner.setVenueId("venue_thane_05");
+                persistUser(existingOwner);
+            }
         }
 
         if (!users.containsKey("demo_admin")) {
@@ -447,6 +481,26 @@ public class FirebaseService {
 
     public void persistAuditLog(AuditLog entry) {
         if (neonPersistenceService != null && entry != null) neonPersistenceService.saveAuditLog(entry);
+    }
+
+    private void deleteUserFromDb(String uid) {
+        if (neonPersistenceService != null && uid != null) neonPersistenceService.deleteUser(uid);
+    }
+
+    private void deleteVenueFromDb(String venueId) {
+        if (neonPersistenceService != null && venueId != null) neonPersistenceService.deleteVenue(venueId);
+    }
+
+    private void deleteResourceFromDb(String resourceId) {
+        if (neonPersistenceService != null && resourceId != null) neonPersistenceService.deleteResource(resourceId);
+    }
+
+    private void deleteFacilityFromDb(String courtId) {
+        if (neonPersistenceService != null && courtId != null) neonPersistenceService.deleteFacility(courtId);
+    }
+
+    private void deleteBookingFromDb(String bookingId) {
+        if (neonPersistenceService != null && bookingId != null) neonPersistenceService.deleteBooking(bookingId);
     }
 
     public Optional<SlotLockRecord> findActiveDbSlotLock(String resourceId, String date, String startTime) {

@@ -16,6 +16,7 @@ public class UserRecord {
     private long loyaltyPoints = 100;
     private boolean isPhoneVerified = true;
     private boolean isEmailVerified = true;
+    private String venueId;
     private long createdAt = System.currentTimeMillis();
     private long updatedAt = System.currentTimeMillis();
 
@@ -105,6 +106,7 @@ public class UserRecord {
         this.ownerProfile = ownerProfile;
     }
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     public String getPasswordHash() {
         return passwordHash;
     }
@@ -154,7 +156,17 @@ public class UserRecord {
     }
 
     public String getVenueId() {
-        return "venue_thane_01";
+        if (venueId != null && !venueId.isBlank()) {
+            return venueId;
+        }
+        if ("demo_owner".equals(uid)) {
+            return "venue_thane_01";
+        }
+        return null;
+    }
+
+    public void setVenueId(String venueId) {
+        this.venueId = venueId;
     }
 
     public long getCreatedAt() {

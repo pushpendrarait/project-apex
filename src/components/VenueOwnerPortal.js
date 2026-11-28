@@ -8,6 +8,7 @@ import { VenueService } from '../services/venueService.js';
 import { AddVenueModal } from './AddVenueModal.js';
 import { mockDb } from '../services/firebaseConfig.js';
 import { UserService } from '../services/userService.js';
+import { ApiClient } from '../services/apiClient.js';
 
 export class VenueOwnerPortal {
   constructor({ onBack }) {
@@ -15,6 +16,8 @@ export class VenueOwnerPortal {
     this.ownerId = currentUser ? currentUser.uid : 'owner_01';
     this.venueId = (currentUser && currentUser.venueId) ? currentUser.venueId : 'venue_thane_01';
     this.onBack = onBack;
+    this._syncedOwnerKey = null;
+    this._statusMessage = null;
   }
 
   render(container) {
@@ -63,7 +66,7 @@ export class VenueOwnerPortal {
     }
 
     // If signed in as player
-    if (currentUser.role !== 'venue_owner') {
+    if (!ApiClient.isOwnerRole(currentUser.role)) {
       container.innerHTML = `
         <div class="max-w-xl mx-auto py-12 px-4 text-center space-y-6 animate-fade-in">
           <div class="w-20 h-20 mx-auto rounded-3xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center text-4xl shadow-xl shadow-indigo-500/10">
@@ -105,9 +108,59 @@ export class VenueOwnerPortal {
     }
 
     this.ownerId = currentUser.uid;
-    this.venueId = currentUser.venueId || this.venueId;
-    const venue = VenueService.getVenueById(this.venueId) || Object.values(mockDb.data.venues)[0];
-    this.venueId = venue.venueId;
+    if (typeof window !== 'undefined' && ApiClient.getToken() && this._syncedOwnerKey !== currentUser.uid) {
+      this._syncedOwnerKey = currentUser.uid;
+      Promise.all([
+        ApiClient.getOwnerVenues().then(async res => {
+          if (res && Array.isArray(res.data) && res.data.length > 0) {
+            for (const raw of res.data) {
+              const mv = VenueService.mapBackendVenue(raw);
+              if (mv) {
+                mockDb.data.venues[mv.venueId] = mv;
+                try {
+                  const cRes = await ApiClient.getCourtsForVenue(mv.venueId);
+                  if (cRes && Array.isArray(cRes.data)) {
+                    cRes.data.forEach(rc => {
+                      const mc = VenueService.mapBackendCourt(rc);
+                      if (mc) mockDb.data.courts[mc.courtId] = mc;
+                    });
+                  }
+                } catch (ignored) {}
+              }
+            }
+            if (!mockDb.data.venues[this.venueId] || mockDb.data.venues[this.venueId].ownerId !== this.ownerId) {
+              this.venueId = res.data[0].venueId;
+            }
+            mockDb.persist();
+          }
+        }).catch(() => {}),
+        BookingService.syncOwnerBookingsFromBackend().catch(() => {})
+      ]).then(() => {
+        if (container.isConnected) this.render(container);
+      });
+    }
+
+    const ownerVenues = Object.values(mockDb.data.venues).filter(v => v.ownerId === this.ownerId);
+    const preferredVenue = (currentUser.venueId && mockDb.data.venues[currentUser.venueId])
+      || mockDb.data.venues[this.venueId]
+      || ownerVenues[0]
+      || Object.values(mockDb.data.venues)[0];
+    this.venueId = preferredVenue?.venueId || this.venueId;
+    const venue = preferredVenue;
+    const venuesDropdownList = ownerVenues.length > 0 ? ownerVenues : (venue ? [venue] : []);
+
+    if (!venue) {
+      container.innerHTML = `
+        <div class="max-w-xl mx-auto py-12 px-4 text-center space-y-4">
+          <h3 class="text-xl font-black text-white">No Facilities Configured Yet</h3>
+          <button id="btn-owner-add-venue" class="px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs">+ Create First Facility</button>
+        </div>`;
+      container.querySelector('#btn-owner-add-venue')?.addEventListener('click', () => {
+        AddVenueModal.show({ onVenueAdded: (nv) => { this.venueId = nv.venueId; this.render(container); } });
+      });
+      return;
+    }
+
     const courts = VenueService.getCourtsForVenue(this.venueId);
     const bookings = BookingService.getVenueBookings(this.venueId);
 
@@ -118,15 +171,28 @@ export class VenueOwnerPortal {
       <div class="space-y-6 animate-fade-in">
         <!-- Header -->
         <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 text-xs font-bold uppercase tracking-wider mb-2">
+          <div class="space-y-1.5">
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 text-xs font-bold uppercase tracking-wider mb-1">
               🏢 Partner Portal & Gate Management
             </div>
-            <h2 class="text-2xl font-black text-white">${venue.name}</h2>
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="text-2xl font-black text-white">${venue.name}</h2>
+              ${venuesDropdownList.length > 1 ? `
+                <select id="select-owner-venue" class="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1 text-xs text-slate-200 font-semibold">
+                  ${venuesDropdownList.map(v => `<option value="${v.venueId}" ${v.venueId === venue.venueId ? 'selected' : ''}>${v.name}</option>`).join('')}
+                </select>
+              ` : ''}
+            </div>
             <p class="text-xs text-slate-400">${venue.area}, ${venue.city} • Managed by ${venue.ownerId === this.ownerId ? 'You' : 'Partner'}</p>
           </div>
 
-          <div class="flex flex-wrap items-center gap-3">
+          <div class="flex flex-wrap items-center gap-2.5">
+            <button id="btn-owner-edit-venue" class="px-3.5 py-2.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 font-bold text-xs transition">
+              ✏️ Edit Venue
+            </button>
+            <button id="btn-owner-delete-venue" class="px-3.5 py-2.5 rounded-xl bg-red-950/60 hover:bg-red-900/60 text-red-300 border border-red-800/40 font-bold text-xs transition">
+              🗑️ Delete Venue
+            </button>
             <button id="btn-owner-walkin" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition flex items-center gap-1.5">
               <span>⚡ + Walk-In Reservation</span>
             </button>
@@ -134,10 +200,17 @@ export class VenueOwnerPortal {
               <span>+ Add New Facility</span>
             </button>
             <button id="btn-back-owner" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition">
-              ← Switch to Player View
+              ← Player View
             </button>
           </div>
         </div>
+
+        ${this._statusMessage ? `
+          <div id="owner-portal-status" class="text-xs p-3.5 rounded-2xl border ${this._statusMessage.isError ? 'bg-red-950/80 border-red-500/40 text-red-300' : 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300'} flex items-center justify-between">
+            <span>${this._statusMessage.text}</span>
+            <button id="btn-dismiss-owner-status" class="text-slate-400 hover:text-white ml-4">✕</button>
+          </div>
+        ` : ''}
 
         <!-- Metrics Grid -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -175,7 +248,7 @@ export class VenueOwnerPortal {
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             ${courts.map(c => `
-              <div class="bg-slate-950/80 border border-slate-800/80 rounded-xl p-4 space-y-2">
+              <div data-court-card="${c.courtId}" class="bg-slate-950/80 border border-slate-800/80 rounded-xl p-4 space-y-2.5">
                 <div class="flex items-center justify-between">
                   <span class="font-bold text-white text-xs">${c.name}</span>
                   <span class="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">${c.sport}</span>
@@ -189,6 +262,10 @@ export class VenueOwnerPortal {
                 <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-xs font-mono">
                   <span class="text-emerald-400 font-bold">Base: ₹${c.baseHourlyRate}/hr</span>
                   <span class="text-amber-400 font-bold">Peak: ₹${c.peakHourlyRate}/hr</span>
+                </div>
+                <div class="flex gap-2 pt-1">
+                  <button data-court-id="${c.courtId}" class="btn-edit-court flex-1 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold transition">✏️ Edit</button>
+                  <button data-court-id="${c.courtId}" class="btn-delete-court flex-1 py-1.5 rounded-lg bg-red-950/50 hover:bg-red-900/60 text-red-300 border border-red-800/40 text-[11px] font-bold transition">🗑️ Delete</button>
                 </div>
               </div>
             `).join('')}
@@ -262,6 +339,9 @@ export class VenueOwnerPortal {
                       <button data-token="${b.qrPassToken}" class="btn-quick-checkin px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow-sm">
                         Check In
                       </button>
+                      <button data-booking-id="${b.bookingId}" class="btn-owner-cancel-booking px-3 py-1.5 rounded-xl bg-red-950/60 hover:bg-red-900/60 text-red-300 border border-red-800/40 font-bold text-xs transition">
+                        Cancel (100%)
+                      </button>
                     ` : ''}
                   </div>
                 </div>
@@ -279,8 +359,38 @@ export class VenueOwnerPortal {
   }
 
   bindEvents(container) {
-    container.querySelector('#btn-back-owner').addEventListener('click', () => {
+    container.querySelector('#btn-dismiss-owner-status')?.addEventListener('click', () => {
+      this._statusMessage = null;
+      this.render(container);
+    });
+
+    container.querySelector('#select-owner-venue')?.addEventListener('change', (e) => {
+      this.venueId = e.target.value;
+      this.render(container);
+    });
+
+    container.querySelector('#btn-back-owner')?.addEventListener('click', () => {
       if (this.onBack) this.onBack();
+    });
+
+    container.querySelector('#btn-owner-edit-venue')?.addEventListener('click', () => {
+      const venue = VenueService.getVenueById(this.venueId);
+      if (venue) this.showEditVenueModal(container, venue);
+    });
+
+    container.querySelector('#btn-owner-delete-venue')?.addEventListener('click', async () => {
+      const venue = VenueService.getVenueById(this.venueId);
+      if (!venue) return;
+      try {
+        await VenueService.deleteVenueAndSync(venue.venueId);
+        this._statusMessage = { isError: false, text: `✓ Venue "${venue.name}" deleted.` };
+        const remaining = Object.values(mockDb.data.venues).filter(v => v.ownerId === this.ownerId);
+        this.venueId = remaining[0]?.venueId || Object.keys(mockDb.data.venues)[0];
+        this.render(container);
+      } catch (err) {
+        this._statusMessage = { isError: true, text: `❌ Delete failed: ${err.message}` };
+        this.render(container);
+      }
     });
 
     const btnAddVenue = container.querySelector('#btn-owner-add-venue');
@@ -289,6 +399,7 @@ export class VenueOwnerPortal {
         AddVenueModal.show({
           onVenueAdded: (newVenue) => {
             this.venueId = newVenue.venueId;
+            this._statusMessage = { isError: false, text: `✓ Facility "${newVenue.name}" added.` };
             this.render(container);
           }
         });
@@ -301,6 +412,52 @@ export class VenueOwnerPortal {
         this.showAddCourtModal(container);
       });
     }
+
+    container.querySelectorAll('.btn-edit-court').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const courtId = e.currentTarget.getAttribute('data-court-id');
+        const court = mockDb.data.courts[courtId];
+        if (court) this.showEditCourtModal(container, court);
+      });
+    });
+
+    container.querySelectorAll('.btn-delete-court').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const courtId = e.currentTarget.getAttribute('data-court-id');
+        try {
+          await VenueService.deleteCourtAndSync(courtId);
+          this._statusMessage = { isError: false, text: `✓ Facility court ${courtId} removed.` };
+          this.render(container);
+        } catch (err) {
+          this._statusMessage = { isError: true, text: `❌ Delete court failed: ${err.message}` };
+          this.render(container);
+        }
+      });
+    });
+
+    container.querySelectorAll('.btn-owner-cancel-booking').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const bookingId = e.currentTarget.getAttribute('data-booking-id');
+        try {
+          if (typeof window !== 'undefined' && ApiClient.getToken()) {
+            const res = await ApiClient.cancelBookingByOwner(bookingId, 'Owner emergency cancellation');
+            if (res && res.data) {
+              const nb = BookingService.normalizeBackendBooking(res.data);
+              mockDb.data.bookings[bookingId] = nb;
+              mockDb.persist();
+            }
+          } else if (mockDb.data.bookings[bookingId]) {
+            mockDb.data.bookings[bookingId].status = 'CANCELLED_BY_OWNER';
+            mockDb.persist();
+          }
+          this._statusMessage = { isError: false, text: `✓ Booking ${bookingId} cancelled by owner (100% refund issued).` };
+          this.render(container);
+        } catch (err) {
+          this._statusMessage = { isError: true, text: `❌ Owner cancel failed: ${err.message}` };
+          this.render(container);
+        }
+      });
+    });
 
     const btnWalkIn = container.querySelector('#btn-owner-walkin');
     if (btnWalkIn) {
@@ -334,9 +491,9 @@ export class VenueOwnerPortal {
     });
   }
 
-  handleGateCheckIn(token, resultBox, container) {
+  async handleGateCheckIn(token, resultBox, container) {
     try {
-      const checkInRes = BookingService.checkInPlayer(token, this.ownerId);
+      const checkInRes = await BookingService.checkInPlayerAndSync(token, this.ownerId);
       const b = checkInRes.booking;
 
       resultBox.classList.remove('hidden');
@@ -356,8 +513,7 @@ export class VenueOwnerPortal {
           <div>Slot: <strong>${b.date} @ ${b.slot}</strong> on ${b.courtName}</div>
           <div class="text-[11px] font-mono text-emerald-400">Status: CHECKED_IN • Token: ${b.qrPassToken}</div>
         `;
-        // Refresh schedule after brief pause to show updated state
-        setTimeout(() => this.render(container), 1200);
+        setTimeout(() => this.render(container), 800);
       }
     } catch (err) {
       resultBox.classList.remove('hidden');
@@ -582,7 +738,7 @@ export class VenueOwnerPortal {
     modalContainer.querySelector('#btn-close-court-modal').addEventListener('click', close);
     modalContainer.querySelector('#btn-cancel-court-modal').addEventListener('click', close);
 
-    modalContainer.querySelector('#form-add-court').addEventListener('submit', (e) => {
+    modalContainer.querySelector('#form-add-court').addEventListener('submit', async (e) => {
       e.preventDefault();
       const name = modalContainer.querySelector('#input-court-name').value.trim();
       const sport = modalContainer.querySelector('#input-court-sport').value;
@@ -593,20 +749,132 @@ export class VenueOwnerPortal {
       const peakHourlyRate = modalContainer.querySelector('#input-court-peak').value;
       const oddHourDiscountPct = modalContainer.querySelector('#input-court-discount').value;
 
-      VenueService.addCourt({
-        venueId: this.venueId,
-        name,
-        sport,
-        capacity: Number(capacity),
-        surface,
-        isIndoor,
-        baseHourlyRate: Number(baseHourlyRate),
-        peakHourlyRate: Number(peakHourlyRate),
-        oddHourDiscountPct: Number(oddHourDiscountPct)
-      });
+      try {
+        await VenueService.addCourtAndSync({
+          venueId: this.venueId,
+          name,
+          sport,
+          capacity: Number(capacity),
+          surface,
+          isIndoor,
+          baseHourlyRate: Number(baseHourlyRate),
+          peakHourlyRate: Number(peakHourlyRate),
+          oddHourDiscountPct: Number(oddHourDiscountPct)
+        });
+        this._statusMessage = { isError: false, text: `✓ Court "${name}" added and persisted.` };
+        close();
+        this.render(container);
+      } catch (err) {
+        this._statusMessage = { isError: true, text: `❌ Add court failed: ${err.message}` };
+        close();
+        this.render(container);
+      }
+    });
+  }
 
-      close();
-      this.render(container);
+  showEditVenueModal(container, venue) {
+    const modalContainer = container.querySelector('#walkin-modal-container');
+    modalContainer.innerHTML = `
+      <div class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 text-xs text-white">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+            <h3 class="text-lg font-black">Edit Venue Details</h3>
+            <button id="btn-close-edit-venue" class="w-8 h-8 rounded-full bg-slate-800 text-slate-300">✕</button>
+          </div>
+          <form id="form-edit-venue" class="space-y-3">
+            <div>
+              <label class="block text-slate-400 font-bold mb-1">Venue Name</label>
+              <input id="edit-venue-name" type="text" required value="${venue.name}" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white" />
+            </div>
+            <div>
+              <label class="block text-slate-400 font-bold mb-1">Locality / Area</label>
+              <input id="edit-venue-area" type="text" required value="${venue.area}" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white" />
+            </div>
+            <div>
+              <label class="block text-slate-400 font-bold mb-1">Starting Base Rate (₹/hr)</label>
+              <input id="edit-venue-price" type="number" min="200" required value="${venue.startingPrice || 1000}" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono" />
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+              <button type="button" id="btn-cancel-edit-venue" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold">Cancel</button>
+              <button type="submit" id="btn-save-edit-venue" class="px-5 py-2 rounded-xl bg-emerald-500 text-slate-950 font-black">Save Venue</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    const close = () => { modalContainer.innerHTML = ''; };
+    modalContainer.querySelector('#btn-close-edit-venue').addEventListener('click', close);
+    modalContainer.querySelector('#btn-cancel-edit-venue').addEventListener('click', close);
+    modalContainer.querySelector('#form-edit-venue').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await VenueService.updateVenueAndSync(venue.venueId, {
+          name: modalContainer.querySelector('#edit-venue-name').value.trim(),
+          area: modalContainer.querySelector('#edit-venue-area').value.trim(),
+          startingPrice: Number(modalContainer.querySelector('#edit-venue-price').value)
+        });
+        this._statusMessage = { isError: false, text: '✓ Venue updated successfully.' };
+        close();
+        this.render(container);
+      } catch (err) {
+        this._statusMessage = { isError: true, text: `❌ Update venue failed: ${err.message}` };
+        close();
+        this.render(container);
+      }
+    });
+  }
+
+  showEditCourtModal(container, court) {
+    const modalContainer = container.querySelector('#walkin-modal-container');
+    modalContainer.innerHTML = `
+      <div class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 text-xs text-white">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+            <h3 class="text-lg font-black">Edit Court / Facility</h3>
+            <button id="btn-close-edit-court" class="w-8 h-8 rounded-full bg-slate-800 text-slate-300">✕</button>
+          </div>
+          <form id="form-edit-court" class="space-y-3">
+            <div>
+              <label class="block text-slate-400 font-bold mb-1">Court Name</label>
+              <input id="edit-court-name" type="text" required value="${court.name}" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-400 font-bold mb-1">Base (₹/hr)</label>
+                <input id="edit-court-base" type="number" min="200" required value="${court.baseHourlyRate}" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono" />
+              </div>
+              <div>
+                <label class="block text-slate-400 font-bold mb-1">Peak (₹/hr)</label>
+                <input id="edit-court-peak" type="number" min="200" required value="${court.peakHourlyRate}" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono" />
+              </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+              <button type="button" id="btn-cancel-edit-court" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold">Cancel</button>
+              <button type="submit" id="btn-save-edit-court" class="px-5 py-2 rounded-xl bg-emerald-500 text-slate-950 font-black">Save Court</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    const close = () => { modalContainer.innerHTML = ''; };
+    modalContainer.querySelector('#btn-close-edit-court').addEventListener('click', close);
+    modalContainer.querySelector('#btn-cancel-edit-court').addEventListener('click', close);
+    modalContainer.querySelector('#form-edit-court').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await VenueService.updateCourtAndSync(court.courtId, {
+          name: modalContainer.querySelector('#edit-court-name').value.trim(),
+          baseHourlyRate: Number(modalContainer.querySelector('#edit-court-base').value),
+          peakHourlyRate: Number(modalContainer.querySelector('#edit-court-peak').value)
+        });
+        this._statusMessage = { isError: false, text: '✓ Court updated successfully.' };
+        close();
+        this.render(container);
+      } catch (err) {
+        this._statusMessage = { isError: true, text: `❌ Update court failed: ${err.message}` };
+        close();
+        this.render(container);
+      }
     });
   }
 }

@@ -2,14 +2,14 @@
 
 /**
  * Project Apex - Hierarchical Multi-Agent Orchestrator & Deployment CLI
- * Coordinates the 6 hierarchical agents across 3 cloud tiers:
- *   apex-pm -> [apex-ba, apex-tech-lead -> [apex-ui, apex-java, apex-db]]
+ * Coordinates the hierarchical agents across 3 cloud tiers:
+ *   apex-pm -> [apex-ba, apex-tech-lead -> [apex-ui, apex-java, apex-db, apex-deploy, apex-mobile, apex-test-lead]]
  * Tiers:
  *   1. Frontend:   Firebase Hosting (BookMyShow/Snabbit PWA)
  *   2. Middleware: Render Docker / Java 21 Spring Boot
  *   3. Database:   Neon Serverless PostgreSQL (ACID Locks)
  * Enforces Zero Cloud Functions, Spark Tier Read Quotas, 3-tier audits,
- * and verifies all 7 Core Business Workflows end-to-end.
+ * QA release certification, and verifies all Core Business Workflows end-to-end.
  */
 
 import fs from 'fs';
@@ -129,7 +129,7 @@ function verifyConstraints() {
   log('🔍 RUNNING PRE-FLIGHT COMPLIANCE & 3-TIER ARCHITECTURAL AUDITS...', '\x1b[36m');
 
   let passed = 0;
-  const total = 12;
+  const total = 13;
 
   // 1. Zero Cloud Functions check
   const functionsDir = path.join(ROOT_DIR, 'functions');
@@ -292,6 +292,17 @@ function verifyConstraints() {
     log(`  [FAIL 12/${total}] Missing index.html, firebase.json, or src/services/apiClient.js.`, '\x1b[31m');
   }
 
+  // 13. QA & Release Certification (apex-test-lead reporting to apex-tech-lead) check
+  const testLeadAgent = agentsConfig.agents['apex-test-lead'];
+  const testPlanPath = path.join(ROOT_DIR, 'docs', 'qa', 'test-plan-and-cases.md');
+  const certPath = path.join(ROOT_DIR, 'docs', 'qa', 'test-evidence-and-release-certification.md');
+  if (testLeadAgent && testLeadAgent.reportsTo === 'apex-tech-lead' && fs.existsSync(testPlanPath) && fs.existsSync(certPath)) {
+    log(`  [PASS 13/${total}] QA & Release Certification (apex-test-lead -> apex-tech-lead): Test plan & certification docs verified.`, '\x1b[32m');
+    passed++;
+  } else {
+    log(`  [FAIL 13/${total}] apex-test-lead configuration or docs/qa/ artifacts missing.`, '\x1b[31m');
+  }
+
   log(`\nAUDIT RESULT: ${passed}/${total} checks passed (${((passed / total) * 100).toFixed(0)}%).`, passed === total ? '\x1b[32m' : '\x1b[31m');
   return passed === total;
 }
@@ -370,14 +381,14 @@ function runAgent(agentSlug) {
 
 function runPipeline() {
   console.log(BANNER);
-  log('⚡ EXECUTING HIERARCHICAL 6-AGENT SPEC KITTY PIPELINE (3 CLOUD TIERS)\n', '\x1b[36m');
-  log('   Execution Flow: apex-pm -> apex-ba -> apex-tech-lead -> [apex-db, apex-java, apex-ui]\n', '\x1b[35m');
+  log('⚡ EXECUTING HIERARCHICAL 9-AGENT SPEC KITTY PIPELINE (3 CLOUD TIERS)\n', '\x1b[36m');
+  log('   Execution Flow: apex-pm -> apex-ba -> apex-tech-lead -> [apex-db, apex-java, apex-ui, apex-deploy, apex-mobile, apex-test-lead]\n', '\x1b[35m');
 
   const stages = [
     { label: 'STAGE 1 (Top Coordinator)', agents: ['apex-pm'] },
     { label: 'STAGE 2 (Business Analysis — reportsTo: apex-pm)', agents: ['apex-ba'] },
     { label: 'STAGE 3 (Technical Lead — reportsTo: apex-pm)', agents: ['apex-tech-lead'] },
-    { label: 'STAGE 4 (3-Tier Implementation Squad — reportsTo: apex-tech-lead)', agents: ['apex-db', 'apex-java', 'apex-ui'] }
+    { label: 'STAGE 4 (Engineering & QA Squad — reportsTo: apex-tech-lead)', agents: ['apex-db', 'apex-java', 'apex-ui', 'apex-deploy', 'apex-mobile', 'apex-test-lead'] }
   ];
 
   let allAgentsOk = true;
@@ -400,7 +411,7 @@ function runPipeline() {
 
   if (allAgentsOk && auditOk && workflowsOk) {
     log(`\n========================================================================`);
-    log(`✓ ALL 6 HIERARCHICAL AGENTS, 12 AUDITS & ALL 7 WORKFLOWS PASSED ACROSS 3 TIERS.`, '\x1b[32m');
+    log(`✓ ALL 9 HIERARCHICAL AGENTS, 13 AUDITS & ALL 7 WORKFLOWS PASSED ACROSS 3 TIERS.`, '\x1b[32m');
     log(`========================================================================\n`);
     return true;
   }

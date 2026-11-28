@@ -73,21 +73,30 @@ export class UserService {
 
     const clean = identifier.trim().toLowerCase();
 
-    // 1. Try Java Spring Boot backend first
-    try {
-      const res = await ApiClient.loginWithPassword({ identifier: clean, password });
-      if (res && res.data && res.data.user) {
-        const backendUser = { ...res.data.user, password };
-        mockDb.data.users[backendUser.uid] = backendUser;
-        mockDb.persist();
-        this.setCurrentUser(backendUser.uid);
-        return { user: backendUser, token: res.data.token, source: 'backend' };
-      }
-    } catch (backendErr) {
-      console.warn('[UserService] Java backend password login fallback:', backendErr.message);
-      // If error was 400 with invalid credentials, rethrow
-      if (backendErr.message.includes('Incorrect password') || backendErr.message.includes('No account registered')) {
-        throw backendErr;
+    // 1. Try Java Spring Boot backend first (in browser UI runtime)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await ApiClient.loginWithPassword({ identifier: clean, password });
+        if (res && res.data && res.data.user) {
+          const raw = res.data.user;
+          const backendUser = {
+            ...raw,
+            displayName: raw.displayName || raw.fullName || 'Apex User',
+            venueId: raw.venueId || (ApiClient.isOwnerRole(raw.role) ? raw.venueId : null),
+            password
+          };
+          mockDb.data.users[backendUser.uid] = backendUser;
+          mockDb.persist();
+          this.setCurrentUser(backendUser.uid);
+          await VenueService.syncVenuesFromBackend();
+          return { user: backendUser, token: res.data.token, source: 'backend' };
+        }
+      } catch (backendErr) {
+        console.warn('[UserService] Java backend password login fallback:', backendErr.message);
+        // If error was 400 with invalid credentials, rethrow
+        if (backendErr.message.includes('Incorrect password') || backendErr.message.includes('No account registered')) {
+          throw backendErr;
+        }
       }
     }
 
@@ -131,30 +140,42 @@ export class UserService {
     if (!email || !email.trim()) throw new Error("Email address is required.");
     if (!password || password.length < 6) throw new Error("Password must be at least 6 characters.");
 
-    // 1. Try Java Spring Boot backend first
-    try {
-      const res = await ApiClient.registerWithPassword({
-        displayName,
-        phone,
-        email,
-        password,
-        role,
-        city,
-        facilityName,
-        area,
-        sports,
-        startingPrice: Number(startingPrice) || 1200
-      });
+    // 1. Try Java Spring Boot backend first (in browser UI runtime)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await ApiClient.registerWithPassword({
+          displayName,
+          phone,
+          email,
+          password,
+          role,
+          city,
+          facilityName,
+          area,
+          sports,
+          startingPrice: Number(startingPrice) || 1200
+        });
 
-      if (res && res.data && res.data.user) {
-        const backendUser = { ...res.data.user, password };
-        mockDb.data.users[backendUser.uid] = backendUser;
-        mockDb.persist();
-        this.setCurrentUser(backendUser.uid);
-        return { user: backendUser, token: res.data.token, source: 'backend' };
+        if (res && res.data && res.data.user) {
+          const raw = res.data.user;
+          const backendUser = {
+            ...raw,
+            displayName: raw.displayName || raw.fullName || displayName,
+            venueId: raw.venueId || null,
+            password
+          };
+          mockDb.data.users[backendUser.uid] = backendUser;
+          mockDb.persist();
+          this.setCurrentUser(backendUser.uid);
+          await VenueService.syncVenuesFromBackend();
+          return { user: backendUser, token: res.data.token, source: 'backend' };
+        }
+      } catch (backendErr) {
+        console.warn('[UserService] Java backend register fallback:', backendErr.message);
+        if (backendErr.message.includes('already registered')) {
+          throw backendErr;
+        }
       }
-    } catch (backendErr) {
-      console.warn('[UserService] Java backend register fallback:', backendErr.message);
     }
 
     // 2. Local database fallback
@@ -217,6 +238,9 @@ export class UserService {
    */
   static logout() {
     this.setCurrentUser('guest');
+    if (typeof window !== 'undefined') {
+      ApiClient.logout();
+    }
   }
 
   /**
@@ -381,5 +405,54 @@ export class UserService {
     Object.assign(user, updates, { updatedAt: Date.now() });
     mockDb.persist();
     return user;
+  }
+
+  /**
+   * Live-sync profile update (Render + Neon)
+   */
+  static async updateProfileAsync({ fullName, phone, city }) {
+    const current = this.getCurrentUser();
+    if (!current) {
+      throw new Error('Authentication required to update profile.');
+    }
+    if (typeof window !== 'undefined' && ApiClient.getToken()) {
+      const res = await ApiClient.updateProfile({
+        fullName: fullName || current.displayName,
+        phone: phone || current.phone,
+        city: city || current.city
+      });
+      if (res && res.data) {
+        const updated = {
+          ...current,
+          ...res.data,
+          displayName: res.data.displayName || res.data.fullName || fullName || current.displayName
+        };
+        mockDb.data.users[updated.uid] = updated;
+        mockDb.persist();
+        return updated;
+      }
+    }
+    return this.updateUser(current.uid, {
+      displayName: fullName || current.displayName,
+      phone: phone || current.phone,
+      city: city || current.city
+    });
+  }
+
+  /**
+   * Live-sync account deletion (Render + Neon)
+   */
+  static async deleteAccountAsync() {
+    const current = this.getCurrentUser();
+    if (!current) {
+      throw new Error('Authentication required.');
+    }
+    if (typeof window !== 'undefined' && ApiClient.getToken()) {
+      await ApiClient.deleteProfile();
+    }
+    delete mockDb.data.users[current.uid];
+    mockDb.persist();
+    this.logout();
+    return true;
   }
 }

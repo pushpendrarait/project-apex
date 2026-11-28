@@ -6,6 +6,7 @@ import java.util.List;
 public class BookingRecord {
     private String bookingId;
     private String bookingCode; // e.g. ARENA-94K2M
+    private String qrPassToken;
     private String userId;
     private String userName;
     private String userPhone;
@@ -32,6 +33,8 @@ public class BookingRecord {
     private Long refundAmountPaise;
     private String refundStatus;
     private String cancellationReason;
+    private String notes;
+    private Long checkedInAt;
     private Long holdExpiresAt;
     private long createdAt = System.currentTimeMillis();
     private long updatedAt = System.currentTimeMillis();
@@ -61,7 +64,30 @@ public class BookingRecord {
     }
 
     public String getQrPassToken() {
+        if (qrPassToken != null && !qrPassToken.isBlank()) {
+            return qrPassToken;
+        }
         return "APEX-PASS-" + (bookingCode != null ? bookingCode : bookingId);
+    }
+
+    public void setQrPassToken(String qrPassToken) {
+        this.qrPassToken = qrPassToken;
+    }
+
+    public Long getCheckedInAt() {
+        return checkedInAt;
+    }
+
+    public void setCheckedInAt(Long checkedInAt) {
+        this.checkedInAt = checkedInAt;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
     }
 
     public Long getRefundAmount() {

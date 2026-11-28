@@ -5,6 +5,7 @@
 
 import { mockDb } from './firebaseConfig.js';
 import { ConcurrencyService } from './concurrencyService.js';
+import { ApiClient } from './apiClient.js';
 
 export class CancellationService {
   /**
@@ -62,8 +63,20 @@ export class CancellationService {
       throw new Error("Unauthorized: You do not own this booking reservation.");
     }
 
-    if (booking.status === 'CANCELLED') {
+    if (booking.status === 'CANCELLED' || (booking.status && booking.status.startsWith('CANCELLED'))) {
       throw new Error("This booking has already been cancelled.");
+    }
+
+    if (typeof window !== 'undefined' && ApiClient.getToken()) {
+      try {
+        await ApiClient.cancelBooking(bookingId, 'Player requested cancellation via Apex Web');
+      } catch (err) {
+        const msg = (err.message || '').toLowerCase();
+        if (msg.includes('authorized') || msg.includes('403') || msg.includes('only confirmed')) {
+          throw err;
+        }
+        console.warn('[CancellationService] Backend cancel fallback:', err.message);
+      }
     }
 
     const refund = this.previewRefund(booking);

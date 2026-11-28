@@ -67,6 +67,11 @@ export class ApiClient {
     return getDefaultBaseUrl();
   }
 
+  static isOwnerRole(role) {
+    const r = String(role || '').trim().toUpperCase();
+    return r === 'VENUE_OWNER' || r === 'ROLE_OWNER' || r === 'OWNER';
+  }
+
   static getBaseUrl() {
     return customApiBaseUrl;
   }
@@ -247,6 +252,24 @@ export class ApiClient {
     } catch (ignored) {}
   }
 
+  // --- Users Profile APIs ---
+  static async getMe() {
+    return this.request('/users/me');
+  }
+
+  static async updateProfile(payload) {
+    return this.request('/users/me', {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  static async deleteProfile() {
+    return this.request('/users/me', {
+      method: 'DELETE'
+    });
+  }
+
   // --- Venues & Facilities APIs ---
   static async getVenues(city, sport) {
     const params = new URLSearchParams();
@@ -263,10 +286,47 @@ export class ApiClient {
     return this.request(`/venues/${venueId}/courts`);
   }
 
+  static async getOwnerVenues() {
+    return this.request('/owner/venues');
+  }
+
+  static async createOwnerVenue(payload) {
+    return this.request('/owner/venues', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  static async updateOwnerVenue(venueId, payload) {
+    return this.request(`/owner/venues/${encodeURIComponent(venueId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  static async deleteOwnerVenue(venueId) {
+    return this.request(`/owner/venues/${encodeURIComponent(venueId)}`, {
+      method: 'DELETE'
+    });
+  }
+
   static async addFacility(facilityPayload) {
     return this.request('/facilities', {
       method: 'POST',
       body: JSON.stringify(facilityPayload)
+    });
+  }
+
+  static async updateFacility(courtId, facilityPayload) {
+    return this.request(`/facilities/${encodeURIComponent(courtId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(facilityPayload)
+    });
+  }
+
+  static async deleteFacility(courtId) {
+    return this.request(`/facilities/${encodeURIComponent(courtId)}`, {
+      method: 'DELETE'
     });
   }
 
@@ -300,6 +360,20 @@ export class ApiClient {
     });
   }
 
+  static async initiateBooking(payload) {
+    return this.request('/bookings/initiate', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  static async verifyPayment(bookingId, payload) {
+    return this.request(`/bookings/${encodeURIComponent(bookingId)}/verify-payment`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
   static async commitBooking(bookingPayload) {
     return this.request('/bookings/commit', {
       method: 'POST',
@@ -311,13 +385,49 @@ export class ApiClient {
     return this.request('/bookings/my-passes');
   }
 
-  static async cancelBooking(bookingId) {
-    return this.request(`/bookings/${bookingId}/cancel`, {
-      method: 'POST'
+  static async getBooking(bookingId) {
+    return this.request(`/bookings/${encodeURIComponent(bookingId)}`);
+  }
+
+  static async updateBooking(bookingId, payload) {
+    return this.request(`/bookings/${encodeURIComponent(bookingId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
     });
   }
 
-  // --- Gate & Walk-In ---
+  static async cancelBooking(bookingId, reason = 'Player requested cancellation') {
+    return this.request(`/bookings/${encodeURIComponent(bookingId)}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason })
+    });
+  }
+
+  static async deleteBooking(bookingId) {
+    return this.request(`/bookings/${encodeURIComponent(bookingId)}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // --- Owner Bookings & Gate ---
+  static async getOwnerBookings() {
+    return this.request('/owner/bookings');
+  }
+
+  static async cancelBookingByOwner(bookingId, reason = 'Owner emergency cancellation') {
+    return this.request(`/owner/bookings/${encodeURIComponent(bookingId)}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason })
+    });
+  }
+
+  static async updateOwnerBookingStatus(bookingId, status) {
+    return this.request(`/owner/bookings/${encodeURIComponent(bookingId)}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
+    });
+  }
+
   static async verifyGatePass(qrPassToken) {
     return this.request('/gate/verify-pass', {
       method: 'POST',

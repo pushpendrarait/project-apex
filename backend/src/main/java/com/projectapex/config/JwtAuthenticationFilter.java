@@ -41,7 +41,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     String authority = "ROLE_PLAYER";
                     if (rawRole != null) {
                         String clean = rawRole.trim().toUpperCase();
-                        authority = clean.startsWith("ROLE_") ? clean : "ROLE_" + clean;
+                        if ("VENUE_OWNER".equals(clean) || "ROLE_VENUE_OWNER".equals(clean)
+                                || "OWNER".equals(clean) || "ROLE_OWNER".equals(clean)) {
+                            authority = "ROLE_OWNER";
+                        } else if ("PLAYER".equals(clean) || "ROLE_PLAYER".equals(clean)) {
+                            authority = "ROLE_PLAYER";
+                        } else if ("ADMIN".equals(clean) || "ROLE_ADMIN".equals(clean)) {
+                            authority = "ROLE_ADMIN";
+                        } else {
+                            authority = clean.startsWith("ROLE_") ? clean : "ROLE_" + clean;
+                        }
                     }
                     List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(authority));
                     UsernamePasswordAuthenticationToken authToken =
